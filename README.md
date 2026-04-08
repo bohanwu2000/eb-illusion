@@ -1,2 +1,8 @@
-# eb-illusion
-Empirical Bayes illusion of learning project. 
+# The Illusion of Learning from Observational Data: An Empirical Bayes Perspective
+This repository contains the code accompanying the paper:
+
+>The Illusion of Learning from Observational Data: An Empirical Bayes Perspective
+
+>Bohan Wu, Sebastian Salazar, Donald P. Green, David M. Blei, 2026
+
+
