@@ -80,3 +80,6 @@ ipython_config.py
 *.log
 *.tmp
 *.bak
+
+# Generated figures (regenerate using the scripts)
+figures/

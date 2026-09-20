@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calibrated Empirical Bayes Playground</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+<style>
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #ffffff; color: #1a1a1a;
+  font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, serif; font-size: 15px; }
+.wrap { max-width: 960px; margin: 0 auto; padding: 18px 20px 40px; }
+h1 { font-size: 20px; margin: 0 0 2px; }
+p.sub { color: #555; margin: 0 0 16px; font-size: 13px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 26px; }
+.controls { border: 1px solid #e2e2e2; border-radius: 10px; padding: 14px 16px; background: #fafafa; }
+.row { display: flex; align-items: center; justify-content: space-between; margin: 7px 0; gap: 10px; }
+.row label { font-size: 13px; color: #333; flex: 0 0 auto; }
+.row input[type=range] { flex: 1 1 auto; margin: 0 8px; }
+.row .val { font-variant-numeric: tabular-nums; min-width: 48px; text-align: right; color: #5B2C8D; font-weight: 600; }
+select { font-size: 13px; padding: 2px 4px; }
+.cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 4px; }
+.card { border: 1px solid #e2e2e2; border-radius: 10px; padding: 10px 12px; }
+.card .k { font-size: 12px; color: #666; }
+.card .v { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.good { color: #0A6E31; } .bad { color: #C1121F; } .mid { color: #5B2C8D; }
+.chartbox { height: 300px; margin-top: 6px; }
+.note { font-size: 12px; color: #666; margin-top: 12px; line-height: 1.45; }
+code { background: #f0f0f0; padding: 0 3px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Calibrated empirical Bayes playground</h1>
+  <p class="sub">Monte Carlo over the hierarchical model. One experiment, J observational studies, K calibration studies. True effect &theta; = 1. Drag a slider to update.</p>
+
+  <div class="grid">
+    <div class="controls">
+      <div class="row"><label>Observational studies J</label><input type="range" id="J" min="1" max="300" step="1" value="50"><span class="val" id="Jv"></span></div>
+      <div class="row"><label>Calibration studies K</label><input type="range" id="K" min="1" max="200" step="1" value="20"><span class="val" id="Kv"></span></div>
+      <div class="row"><label>Bias variance &gamma;&sup2;</label><input type="range" id="g2" min="0" max="4" step="0.05" value="1"><span class="val" id="g2v"></span></div>
+      <div class="row"><label>Bias mean &mu;</label><input type="range" id="mu" min="-2" max="2" step="0.05" value="0.5"><span class="val" id="muv"></span></div>
+      <div class="row"><label>Experiment noise &sigma;<sub>e</sub></label><input type="range" id="se" min="0.2" max="3" step="0.05" value="1"><span class="val" id="sev"></span></div>
+      <div class="row"><label>Obs. noise &sigma;<sub>o</sub></label><input type="range" id="so" min="0.2" max="3" step="0.05" value="1"><span class="val" id="sov"></span></div>
+      <div class="row"><label>Calib. noise &sigma;<sub>c</sub></label><input type="range" id="sc" min="0.2" max="3" step="0.05" value="1"><span class="val" id="scv"></span></div>
+    </div>
+    <div class="controls">
+      <div class="row"><label>Transportability gap &delta; = &mu;<sub>c</sub> &minus; &mu;<sub>o</sub></label><input type="range" id="dl" min="0" max="2" step="0.05" value="0"><span class="val" id="dlv"></span></div>
+      <div class="row"><label>Effect heterogeneity &tau;&sup2;</label><input type="range" id="t2" min="0" max="1.5" step="0.05" value="0"><span class="val" id="t2v"></span></div>
+      <div class="row"><label>Bias distribution</label>
+        <select id="shape">
+          <option value="gaussian">Gaussian</option>
+          <option value="skewed">skewed (exponential)</option>
+          <option value="heavy">heavy-tailed (t&#8323;)</option>
+          <option value="bimodal">bimodal</option>
+        </select></div>
+      <div class="row"><label>Monte Carlo replicates</label><input type="range" id="R" min="500" max="6000" step="500" value="2000"><span class="val" id="Rv"></span></div>
+      <div class="cards">
+        <div class="card"><div class="k">MSE of &theta;&#770;<sub>CEB</sub></div><div class="v mid" id="mse">.</div></div>
+        <div class="card"><div class="k">relative to experiment</div><div class="v mid" id="re">.</div></div>
+        <div class="card"><div class="k">coverage, plug-in interval</div><div class="v bad" id="cp">.</div></div>
+        <div class="card"><div class="k">coverage, propagated</div><div class="v good" id="cq">.</div></div>
+      </div>
+      <div class="row" style="margin-top:8px"><label>P(&gamma;&#770;&sup2; truncated to 0)</label><span class="val" id="tr" style="color:#333"></span></div>
+    </div>
+  </div>
+
+  <div class="chartbox"><canvas id="chart"></canvas></div>
+  <div class="note">
+    The <b>plug-in</b> interval is the model-based posterior interval. The <b>propagated</b> interval adds the estimation error in &mu;&#770; and &gamma;&#770;&sup2;.
+    The sweep shows 95% interval coverage against the number of calibration studies K, holding the other settings fixed, with the nominal 0.95 line and a marker at the current K.
+    Raising the transportability gap &delta; biases the estimator and collapses coverage. Raising &tau;&sup2; erodes coverage unless the interval is corrected. The bias shape barely affects results, since only the first two moments enter.
+  </div>
+</div>
+
+<script>
+"use strict";
+function randn(){ let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+function drawBias(mean, sd, shape){
+  if(shape==="gaussian") return mean + sd*randn();
+  if(shape==="skewed"){ let e = -Math.log(Math.random()) - 1; return mean + sd*e; }
+  if(shape==="heavy"){ let z0=randn(), c=(randn()**2+randn()**2+randn()**2)/3;
+    let t=z0/Math.sqrt(c); return mean + sd*(t/Math.sqrt(3)); }
+  if(shape==="bimodal") return mean + sd*(Math.random()<0.5?-1:1);
+  return mean + sd*randn();
+}
+const THETA=1, Z=1.959963985;
+function simulate(p){
+  const {J,K,g2,mu,se,so,sc,dl,t2,shape,R}=p;
+  const sdb=Math.sqrt(g2), sdt=Math.sqrt(t2), muc=mu+dl;
+  let sse=0, cp=0, cq=0, tr=0;
+  for(let r=0;r<R;r++){
+    const ye = THETA + se*randn();
+    // calibration
+    let sum=0, sumsq=0;
+    const yc=new Array(K);
+    for(let k=0;k<K;k++){ const v = drawBias(muc,sdb,shape) + sc*randn(); yc[k]=v; sum+=v; }
+    const ybar=sum/K;
+    for(let k=0;k<K;k++){ const d=yc[k]-ybar; sumsq+=d*d; }
+    let g2h = sumsq/K - sc*sc; if(g2h<0) g2h=0;
+    if(g2h<=1e-12) tr++;
+    const muh=ybar;
+    // observational
+    const we=1/(se*se), wo=1/(so*so+g2h);
+    let sob=0;
+    for(let j=0;j<J;j++){ const tj = THETA + sdt*randn();
+      const yo = tj + drawBias(mu,sdb,shape) + so*randn(); sob += (yo-muh); }
+    const den = we + J*wo;
+    const th = (we*ye + wo*sob)/den;
+    const vv = 1/den;
+    const varmu = (g2h+sc*sc)/K, cc=(J*wo)/den;
+    const vq = vv + cc*cc*varmu;
+    const err = th-THETA; sse += err*err;
+    if(Math.abs(err)<=Z*Math.sqrt(vv)) cp++;
+    if(Math.abs(err)<=Z*Math.sqrt(vq)) cq++;
+  }
+  return {mse:sse/R, coverPlug:cp/R, coverProp:cq/R, trunc:tr/R};
+}
+const ids=["J","K","g2","mu","se","so","sc","dl","t2","R"];
+function readParams(){
+  const g=id=>parseFloat(document.getElementById(id).value);
+  return {J:g("J")|0,K:g("K")|0,g2:g("g2"),mu:g("mu"),se:g("se"),so:g("so"),sc:g("sc"),
+    dl:g("dl"),t2:g("t2"),shape:document.getElementById("shape").value,R:g("R")|0};
+}
+let chart;
+function fmt(x,n){return x.toFixed(n);}
+function render(){
+  const p=readParams();
+  document.getElementById("Jv").textContent=p.J;
+  document.getElementById("Kv").textContent=p.K;
+  document.getElementById("g2v").textContent=fmt(p.g2,2);
+  document.getElementById("muv").textContent=fmt(p.mu,2);
+  document.getElementById("sev").textContent=fmt(p.se,2);
+  document.getElementById("sov").textContent=fmt(p.so,2);
+  document.getElementById("scv").textContent=fmt(p.sc,2);
+  document.getElementById("dlv").textContent=fmt(p.dl,2);
+  document.getElementById("t2v").textContent=fmt(p.t2,2);
+  document.getElementById("Rv").textContent=p.R;
+  const res=simulate(p);
+  document.getElementById("mse").textContent=fmt(res.mse,3);
+  document.getElementById("re").textContent=fmt(res.mse/(p.se*p.se),2)+"x";
+  const cp=document.getElementById("cp"), cq=document.getElementById("cq");
+  cp.textContent=fmt(res.coverPlug,3); cq.textContent=fmt(res.coverProp,3);
+  cp.className="v "+(res.coverPlug>=0.93?"good":"bad");
+  cq.className="v "+(res.coverProp>=0.93?"good":"bad");
+  document.getElementById("tr").textContent=fmt(res.trunc,3);
+  // sweep over K
+  const Ks=[1,2,3,5,10,20,50,100,150];
+  const plug=[], prop=[]; const Rs=Math.min(p.R,1200);
+  for(const kk of Ks){ const s=simulate(Object.assign({},p,{K:kk,R:Rs})); plug.push(s.coverPlug); prop.push(s.coverProp); }
+  const data={labels:Ks, datasets:[
+    {label:"plug-in", data:plug, borderColor:"#C1121F", backgroundColor:"#C1121F", tension:0.25, pointRadius:3},
+    {label:"propagated", data:prop, borderColor:"#5B2C8D", backgroundColor:"#5B2C8D", tension:0.25, pointRadius:3},
+    {label:"nominal 0.95", data:Ks.map(()=>0.95), borderColor:"#999", borderDash:[6,4], pointRadius:0}
+  ]};
+  if(!chart){
+    chart=new Chart(document.getElementById("chart"),{type:"line",data,
+      options:{responsive:true,maintainAspectRatio:false,
+        scales:{x:{type:"logarithmic",title:{display:true,text:"number of calibration studies K"}},
+                y:{min:0,max:1,title:{display:true,text:"coverage of 95% interval"}}},
+        plugins:{legend:{position:"top"},title:{display:true,text:"Coverage vs K (other settings fixed)"}}}});
+  } else { chart.data=data; chart.update("none"); }
+}
+let timer=null;
+function schedule(){ clearTimeout(timer); timer=setTimeout(render,60); }
+ids.forEach(id=>document.getElementById(id).addEventListener("input",schedule));
+document.getElementById("shape").addEventListener("change",schedule);
+render();
+</script>
+</body>
+</html>
