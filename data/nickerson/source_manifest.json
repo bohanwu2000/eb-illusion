@@ -1,0 +1,29 @@
+{
+  "retrieved_utc": "2026-10-02T05:06:56.585828+00:00",
+  "sources": [
+    {
+      "file": "Quality.Nickerson.2007.pdf",
+      "url": "https://sites.temple.edu/nickerson/files/2017/07/Quality.Nickerson.2007.pdf",
+      "bytes": 557848,
+      "sha256": "2f4f2262fcdf1535733fe30d38339a83550dad9960ae0612b79f256ed9b4d32f"
+    },
+    {
+      "file": "pro_v_vol_2002.zip",
+      "url": "https://sites.temple.edu/nickerson/files/2023/03/pro_v_vol_2002.zip",
+      "bytes": 1913852,
+      "sha256": "bcb0db4b1a9898b6d446d2e365376e1c46aa58a5e1ff31d95f66a5c88a76fc13"
+    },
+    {
+      "file": "pro_v_vol_2002.do",
+      "zip_member": "pro_v_vol_2002.do",
+      "bytes": 632,
+      "sha256": "41bd56b2a3958c723f0736e29534e8a656e41ce4be291bb4b991b8baf5980c6d"
+    },
+    {
+      "file": "pro_v_vol_2002.dta",
+      "zip_member": "pro_v_vol_2002.dta",
+      "bytes": 20897747,
+      "sha256": "b8cba67fffbfdc17de4d6f70e715cc6f9b5823dae7f7d1af1852e8bcf76e067f"
+    }
+  ]
+}

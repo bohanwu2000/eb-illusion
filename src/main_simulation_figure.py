@@ -1,30 +1,29 @@
 """
 Regenerates the main simulation figure of Section 4 (figures/sim_main.png) and its
-maximum-likelihood counterpart (figures/sim_main_mle.png). Reproduces the four panels
+maximum-likelihood counterpart (figures/sim_main_mle.png). Set EB_ILLUSION_FIGDIR explicitly to the output figures directory.
+New runs save replicate estimates; --from-results reuses the saved NPZ.
+Reproduces the four panels
 described in the caption: MSE of the calibrated empirical Bayes estimator versus
 the number of studies J=K for varying experimental noise, varying observational
 noise, and varying effect size, plus the relative efficiency against the
 experiment. Fully vectorized moment-matching (sim_main.png) and a vectorized
 grid-search MLE (sim_main_mle.png). Run: python3 main_simulation_figure.py
 """
+import argparse
 import os
+from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
+from paper_plot_style import apply_style, finish_figure, PURPLE, GREEN, RED, GRAY, CEB_COLORS
 
-plt.rcParams.update({
-    "font.family": ["serif"], "mathtext.fontset": "dejavuserif",
-    "axes.titlesize": 15, "axes.labelsize": 14,
-    "xtick.labelsize": 11, "ytick.labelsize": 11, "legend.fontsize": 11,
-    "figure.facecolor": "white", "axes.facecolor": "white",
-    "savefig.facecolor": "white", "lines.linewidth": 2.0, "lines.markersize": 6,
-})
+apply_style()
 HERE = os.path.dirname(os.path.abspath(__file__))
-FIGDIR = os.path.abspath(os.environ.get("EB_ILLUSION_FIGDIR",
-    os.path.join(HERE, "..", "figures")))
+FIGDIR = os.path.abspath(os.environ.get("EB_ILLUSION_FIGDIR", os.path.join(HERE, "..", "figures")))
 os.makedirs(FIGDIR, exist_ok=True)
 
 THETA, MU, GAM2 = 1.0, 0.5, 1.0
-Js = np.array([5, 10, 50, 100, 200, 500, 1000])
+MAX_COUNT = 100
+Js = np.array([5, 10, 50, MAX_COUNT])
 R = 4000
 GAMMA_GRID = np.linspace(0.0, 8.0, 161)     # for MLE
 
@@ -65,51 +64,97 @@ def theta_mle(y_e, y_o, y_c, se, so, sc=1.0):
     return (we * y_e + wo * (y_o - mu[:, None]).sum(1)) / (we + J * wo)
 
 
-def mse_curve(rng, est, theta=THETA, se=1.0, so=1.0):
-    return np.array([np.mean((est(*gen(rng, J, theta, se, so), se, so) - theta) ** 2)
-                     for J in Js])
-
-
-def make_figure(est, fname, seed):
+def generate_results(est, seed):
+    """Persist replicate estimates so future figure changes can reuse this run."""
     rng = np.random.default_rng(seed)
+    result = dict(counts=Js.copy(), seed=np.array(seed), replicates=np.array(R))
+    conditions = [('se', se, THETA, se, 1.) for se in (.5, 1., 2.)]
+    conditions += [('so', so, THETA, 1., so) for so in (.5, 1., 2.)]
+    conditions += [('theta', th, th, 1., 1.) for th in (0., 1., 2.)]
+    conditions += [('re', 1., THETA, 1., 1.)]
+    for label, value, theta, se, so in conditions:
+        result[f'{label}_{value}'] = np.stack([
+            est(*gen(rng, int(j), theta, se, so), se, so) for j in Js])
+    return result
+
+
+def make_figure(est, fname, seed, results=None):
+    results = generate_results(est, seed) if results is None else results
+    counts = np.asarray(results['counts'])
+    keep = (counts > 0) & (counts <= MAX_COUNT)
+    if not keep.any():
+        raise ValueError('No saved study counts between 1 and 100.')
+    plotted_counts = counts[keep]
+    def curve(label, value, theta=THETA):
+        return np.mean((results[f'{label}_{float(value)}'][keep]-theta)**2, axis=-1)
     fig, ax = plt.subplots(2, 2, figsize=(11, 9))
+    condition_styles = tuple(zip(CEB_COLORS[:3], ("o", "s", "^")))
     # (top-left) vary sigma_e
-    for se in [0.5, 1.0, 2.0]:
-        ax[0, 0].plot(Js, mse_curve(rng, est, se=se, so=1.0), "o-", label=fr"$\sigma_e={se}$")
+    for se, (color, marker) in zip([0.5, 1.0, 2.0], condition_styles):
+        ax[0, 0].plot(plotted_counts, curve("se", se),
+                      color=color, marker=marker, ls="-", label=fr"$\sigma_e={se}$")
     ax[0, 0].set_title("(a) varying experimental noise")
     ax[0, 0].set_xlabel(r"$J=K$"); ax[0, 0].set_ylabel(r"MSE of $\hat\theta_{\mathrm{CEB}}$")
     ax[0, 0].set_xscale("log"); ax[0, 0].set_yscale("log"); ax[0, 0].legend(frameon=False)
-    # (top-right) vary sigma_o, compare to naive (sigma_e^2 = 1)
-    for so in [0.5, 1.0, 2.0]:
-        ax[0, 1].plot(Js, mse_curve(rng, est, se=1.0, so=so), "o-", label=fr"$\sigma_o={so}$")
-    ax[0, 1].axhline(1.0, ls="--", color="grey", label="naive (experiment)")
+    # (top-right) vary sigma_o, compare to experimental (sigma_e^2 = 1)
+    for so, (color, marker) in zip([0.5, 1.0, 2.0], condition_styles):
+        ax[0, 1].plot(plotted_counts, curve("so", so),
+                      color=color, marker=marker, ls="-", label=fr"$\sigma_o={so}$")
+    ax[0, 1].axhline(1.0, ls="--", color=RED, label="experimental")
     ax[0, 1].set_title("(b) varying observational noise")
     ax[0, 1].set_xlabel(r"$J=K$"); ax[0, 1].set_ylabel(r"MSE")
     ax[0, 1].set_xscale("log"); ax[0, 1].set_yscale("log"); ax[0, 1].legend(frameon=False)
     # (bottom-left) vary theta*
-    for th in [0.0, 1.0, 2.0]:
-        ax[1, 0].plot(Js, mse_curve(rng, est, theta=th, se=1.0, so=1.0), "o-", label=fr"$\theta^\star={th}$")
+    for th, (color, marker) in zip([0.0, 1.0, 2.0], condition_styles):
+        ax[1, 0].plot(plotted_counts, curve("theta", th, theta=th),
+                      color=color, marker=marker, ls="-", label=fr"$\theta^\star={th}$")
     ax[1, 0].set_title("(c) varying effect size")
     ax[1, 0].set_xlabel(r"$J=K$"); ax[1, 0].set_ylabel(r"MSE of $\hat\theta_{\mathrm{CEB}}$")
     ax[1, 0].set_xscale("log"); ax[1, 0].set_yscale("log"); ax[1, 0].legend(frameon=False)
     # (bottom-right) relative efficiency
-    re = mse_curve(rng, est, se=1.0, so=1.0) / 1.0
-    ax[1, 1].plot(Js, re, "o-", color="#5B2C8D")
-    ax[1, 1].axhline(0.5, ls=":", color="grey")
-    ax[1, 1].set_title("(d) relative efficiency vs experiment")
+    re = curve("re", 1.) / 1.0
+    ax[1, 1].plot(plotted_counts, re, "o-", color=PURPLE)
+    ax[1, 1].axhline(0.5, ls=":", color=GRAY)
+    ax[1, 1].set_title("(d) relative efficiency")
     ax[1, 1].set_xlabel(r"$J=K$"); ax[1, 1].set_ylabel(r"$\mathrm{RE}(J)=\mathrm{MSE}_{\mathrm{CEB}}/\sigma_e^2$")
     ax[1, 1].set_xscale("log")
+    for panel in ax.flat:
+        panel.set_xticks(plotted_counts, labels=[str(int(j)) for j in plotted_counts])
+        panel.xaxis.set_minor_locator(plt.NullLocator())
+    finish_figure(fig, width_fraction=1.)
     fig.tight_layout()
     fig.savefig(os.path.join(FIGDIR, fname), dpi=200, bbox_inches="tight")
+    fig.savefig(Path(FIGDIR) / (Path(fname).stem+".pdf"), bbox_inches="tight")
     plt.close(fig)
-    return Js, re
+    return plotted_counts, re
 
 
-if __name__ == "__main__":
-    Jv, re = make_figure(theta_mom, "sim_main.png", 101)
-    make_figure(theta_mle, "sim_main_mle.png", 202)
-    print("J :", list(Jv))
-    print("RE:", [round(float(x), 4) for x in re])
-    below = Jv[re < 0.5]
-    print("RE first < 0.5 at J =", int(below[0]) if below.size else "never")
-    print("saved sim_main.png, sim_main_mle.png to", FIGDIR)
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--from-results', type=Path)
+    parser.add_argument('--results', type=Path,
+                        default=Path(HERE).parent/'results'/'main_simulation_rerun.npz')
+    args = parser.parse_args()
+    if args.from_results:
+        with np.load(args.from_results) as data:
+            saved = dict(data)
+    else:
+        if args.results.exists():
+            parser.error('Reuse --from-results or choose a new --results path.')
+        saved = {}
+        for name, est, seed in [('mom', theta_mom, 101), ('mle', theta_mle, 202)]:
+            saved.update({name+'_'+key: value for key, value in generate_results(est, seed).items()})
+        args.results.parent.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(args.results, **saved)
+    for name, est, seed, fname in [('mom', theta_mom, 101, 'sim_main.png'),
+                                  ('mle', theta_mle, 202, 'sim_main_mle.png')]:
+        data = {key[len(name)+1:]: value for key, value in saved.items() if key.startswith(name+'_')}
+        jv, re = make_figure(est, fname, seed, results=data)
+        print(name, 'J=K:', jv.tolist(), 'RE:', re.tolist())
+        below = jv[re < .5]
+        print('RE first < 0.5 at J =', int(below[0]) if below.size else 'never')
+    print('Saved sim_main and sim_main_mle PDF/PNG to', FIGDIR)
+
+
+if __name__ == '__main__':
+    main()

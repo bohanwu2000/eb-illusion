@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "Please cite the paper when using this code."
+title: "The Illusion of Learning from Observational Data: An Empirical Bayes Perspective"
+type: software
+authors:
+  - family-names: Wu
+    given-names: Bohan
+  - family-names: Salazar
+    given-names: Sebastian
+  - family-names: Green
+    given-names: Donald P.
+  - family-names: Blei
+    given-names: David M.
+repository-code: "https://github.com/bohanwu2000/eb-illusion"
+url: "https://bohanwu2000.github.io/papers/Wu_et_al_illusion2026.pdf"
+license: MIT

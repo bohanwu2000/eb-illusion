@@ -3,78 +3,225 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Calibrated Empirical Bayes Playground</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+<meta name="description" content="Explore how calibration studies affect empirical Bayes estimation and interval coverage in a hierarchical simulation.">
+<title>Calibration playground · The Illusion of Learning</title>
 <style>
-:root { color-scheme: light; }
+:root { color-scheme: light; --ink: #202027; --muted: #62616c; --line: #dedde3; --paper: #fff; --wash: #f7f6f9; --purple: #5B2C8D; --purple-light: #8D5DAA; --red: #C1121F; }
 * { box-sizing: border-box; }
-body { margin: 0; background: #ffffff; color: #1a1a1a;
-  font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, serif; font-size: 15px; }
-.wrap { max-width: 960px; margin: 0 auto; padding: 18px 20px 40px; }
-h1 { font-size: 20px; margin: 0 0 2px; }
-p.sub { color: #555; margin: 0 0 16px; font-size: 13px; }
-.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 26px; }
-.controls { border: 1px solid #e2e2e2; border-radius: 10px; padding: 14px 16px; background: #fafafa; }
-.row { display: flex; align-items: center; justify-content: space-between; margin: 7px 0; gap: 10px; }
-.row label { font-size: 13px; color: #333; flex: 0 0 auto; }
-.row input[type=range] { flex: 1 1 auto; margin: 0 8px; }
-.row .val { font-variant-numeric: tabular-nums; min-width: 48px; text-align: right; color: #5B2C8D; font-weight: 600; }
-select { font-size: 13px; padding: 2px 4px; }
-.cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 4px; }
-.card { border: 1px solid #e2e2e2; border-radius: 10px; padding: 10px 12px; }
-.card .k { font-size: 12px; color: #666; }
-.card .v { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.good { color: #0A6E31; } .bad { color: #C1121F; } .mid { color: #5B2C8D; }
-.chartbox { height: 300px; margin-top: 6px; }
-.note { font-size: 12px; color: #666; margin-top: 12px; line-height: 1.45; }
-code { background: #f0f0f0; padding: 0 3px; border-radius: 3px; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+a { color: var(--purple); text-underline-offset: 4px; }
+a:hover { text-decoration-thickness: 2px; }
+button, input, select { font: inherit; }
+button, select, summary { cursor: pointer; }
+button, select { min-height: 44px; }
+button { border: 1px solid var(--line); background: white; color: var(--ink); border-radius: 5px; padding: 9px 15px; }
+button:hover { border-color: var(--purple); background: #f8f5fb; }
+button[aria-pressed="true"] { background: var(--purple); border-color: var(--purple); color: white; }
+:focus-visible { outline: 3px solid var(--purple); outline-offset: 4px; }
+.skip { position: absolute; left: 16px; top: -100px; padding: 10px; background: white; z-index: 5; }
+.skip:focus { top: 10px; }
+.wrap { max-width: 1240px; padding: 0 32px; margin: auto; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 20px; min-height: 76px; border-bottom: 1px solid var(--line); }
+.brand { font-family: Georgia, "Times New Roman", serif; font-size: 18px; color: var(--ink); text-decoration: none; }
+nav { display: flex; gap: 24px; font-size: 14px; }
+nav a { display: inline-flex; align-items: center; min-height: 44px; }
+.intro { padding: 38px 0 24px; max-width: 900px; }
+.eyebrow { color: var(--purple); font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; margin: 0 0 10px; }
+h1, h2, h3 { font-family: Georgia, "Times New Roman", serif; font-weight: 400; line-height: 1.18; }
+h1 { font-size: clamp(32px, 4vw, 46px); letter-spacing: -.025em; margin: 0 0 16px; }
+.intro p:last-child { max-width: 790px; margin: 0; color: #52515c; font-size: 17px; }
+h2 { font-size: 25px; margin: 0 0 12px; }
+h3 { font-size: 22px; margin: 0 0 8px; }
+p { margin: 0 0 12px; }
+.start { padding: 19px 22px; border-left: 3px solid var(--purple); background: var(--wash); }
+.start p { margin: 0; font-size: 14px; }
+.presets { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 14px; }
+#preset-note { margin-top: 12px; color: var(--muted); font-size: 13px; }
+.workspace { display: grid; grid-template-columns: 285px minmax(0, 1fr); gap: 36px; margin-top: 32px; align-items: start; }
+.controls { border-right: 1px solid var(--line); padding-right: 25px; }
+.controls h2 { font-size: 22px; }
+.controls p { color: var(--muted); font-size: 13px; }
+.control { margin: 19px 0; }
+.control-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+label { font-size: 14px; }
+output { font: 600 14px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--purple); white-space: nowrap; }
+input[type="range"] { width: 100%; display: block; min-height: 30px; margin: 2px 0; accent-color: var(--purple); cursor: pointer; }
+.control small { display: block; font-size: 12px; line-height: 1.4; color: var(--muted); }
+select { width: 100%; padding: 8px 10px; margin-top: 8px; background: white; color: var(--ink); border: 1px solid #aaa7b2; border-radius: 4px; }
+.controls details { border-top: 1px solid var(--line); padding: 12px 0; }
+summary { padding: 5px 0; font-size: 14px; font-weight: 600; min-height: 38px; }
+.run { display: flex; gap: 8px; margin-top: 18px; }
+.run button { flex: 1; font-size: 14px; }
+.run .primary { background: var(--purple); color: white; border-color: var(--purple); }
+.results { min-width: 0; }
+.results-head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.results-head h2 { margin-bottom: 4px; }
+#run-status { color: var(--muted); font-size: 12px; min-height: 20px; }
+#settings-summary { font-size: 13px; color: var(--muted); margin: 0 0 16px; }
+.metrics { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 16px 0; gap: 18px; margin-bottom: 24px; }
+.metrics dl { margin: 0; }
+.metrics dt { font-size: 12px; color: var(--muted); }
+.metrics dd { margin: 5px 0 0; color: var(--purple); font-size: 27px; font-weight: 500; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.metrics small { display: block; color: var(--muted); font-size: 11px; margin-top: 6px; }
+figure { margin: 0 0 30px; }
+figure h3 { font-size: 22px; }
+.figure-intro { font-size: 14px; color: var(--muted); margin-bottom: 12px; }
+.legend { display: flex; flex-wrap: wrap; gap: 7px 18px; font-size: 12px; margin-bottom: 7px; }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.key { display: inline-block; width: 23px; height: 0; border-top: 2px solid var(--purple); }
+.key.mean { border-color: var(--purple-light); border-top-style: dashed; }
+.key.target { border-color: #777; border-top-style: dashed; }
+.key.experiment { border-color: var(--red); border-top-style: dashed; }
+.plot { width: 100%; height: 310px; display: block; overflow: visible; }
+.plot.mse { height: 250px; }
+.plot text { fill: #53515c; font-family: Georgia, "Times New Roman", serif; font-size: 12px; }
+.plot .axis { stroke: #88858e; stroke-width: .8; }
+.plot .gridline { stroke: #ecebf0; stroke-width: 1; }
+figcaption { color: var(--muted); font-size: 12px; line-height: 1.55; margin-top: 9px; }
+[data-pending="true"] .result-data { opacity: .45; }
+.diagnostics { color: var(--muted); font-size: 13px; margin: 16px 0; }
+.data-details { margin: 12px 0 30px; }
+.table-scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+caption { text-align: left; padding: 10px 0; color: var(--muted); }
+th, td { text-align: right; padding: 9px 8px; border-bottom: 1px solid #eeedf1; }
+th:first-child, td:first-child { text-align: left; }
+thead { background: var(--wash); }
+tr.selected { background: #f4eff9; }
+.model { border-top: 1px solid var(--line); padding: 32px 0; margin-top: 8px; }
+.model-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; }
+.model p { font-size: 14px; color: #53515c; }
+.model h3 { font-size: 19px; margin: 20px 0 10px; }
+.equation { background: var(--wash); border-radius: 4px; padding: 13px 16px; margin: 12px 0; font-family: Georgia, "Times New Roman", serif; line-height: 1.9; overflow-wrap: anywhere; font-size: 15px; }
+.model .scope { border-left: 3px solid var(--purple-light); padding-left: 14px; }
+footer { display: flex; justify-content: space-between; gap: 20px; border-top: 1px solid var(--line); padding: 22px 0 35px; font-size: 12px; color: var(--muted); }
+footer p { margin: 0; }
+noscript p { padding: 20px; background: var(--wash); }
+@media (max-width: 950px) { .wrap { padding: 0 24px; } .workspace { gap: 24px; grid-template-columns: 245px minmax(0, 1fr); } .controls { padding-right: 20px; } .metrics { grid-template-columns: repeat(2, 1fr); gap: 16px; } }
+@media (max-width: 700px) {
+  .wrap { padding: 0 18px; } header { min-height: 70px; gap: 12px; } .brand { font-size: 15px; max-width: 160px; line-height: 1.25; } nav { gap: 15px; font-size: 13px; }
+  .intro { padding-top: 26px; } .intro p:last-child { font-size: 16px; } .start { padding: 16px; } .presets { display: grid; grid-template-columns: 1fr 1fr; } .presets button { font-size: 13px; padding: 10px 8px; }
+  .workspace { grid-template-columns: 1fr; gap: 28px; margin-top: 25px; } .controls { border-right: 0; border-bottom: 1px solid var(--line); padding: 0 0 22px; }
+  .study-controls { display: grid; grid-template-columns: 1fr 1fr; column-gap: 22px; } .control { margin: 12px 0; } input[type="range"] { min-height: 44px; }
+  .model-grid { grid-template-columns: 1fr; gap: 4px; } .plot { height: 280px; } .plot.mse { height: 230px; } .metrics { grid-template-columns: repeat(2, 1fr); }
+  footer { display: block; } footer p + p { margin-top: 10px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
 </style>
 </head>
 <body>
+<a class="skip" href="#results">Skip to simulation results</a>
 <div class="wrap">
-  <h1>Calibrated empirical Bayes playground</h1>
-  <p class="sub">Monte Carlo over the hierarchical model. One experiment, J observational studies, K calibration studies. True effect &theta; = 1. Drag a slider to update.</p>
-
-  <div class="grid">
-    <div class="controls">
-      <div class="row"><label>Observational studies J</label><input type="range" id="J" min="1" max="300" step="1" value="50"><span class="val" id="Jv"></span></div>
-      <div class="row"><label>Calibration studies K</label><input type="range" id="K" min="1" max="200" step="1" value="20"><span class="val" id="Kv"></span></div>
-      <div class="row"><label>Bias variance &gamma;&sup2;</label><input type="range" id="g2" min="0" max="4" step="0.05" value="1"><span class="val" id="g2v"></span></div>
-      <div class="row"><label>Bias mean &mu;</label><input type="range" id="mu" min="-2" max="2" step="0.05" value="0.5"><span class="val" id="muv"></span></div>
-      <div class="row"><label>Experiment noise &sigma;<sub>e</sub></label><input type="range" id="se" min="0.2" max="3" step="0.05" value="1"><span class="val" id="sev"></span></div>
-      <div class="row"><label>Obs. noise &sigma;<sub>o</sub></label><input type="range" id="so" min="0.2" max="3" step="0.05" value="1"><span class="val" id="sov"></span></div>
-      <div class="row"><label>Calib. noise &sigma;<sub>c</sub></label><input type="range" id="sc" min="0.2" max="3" step="0.05" value="1"><span class="val" id="scv"></span></div>
-    </div>
-    <div class="controls">
-      <div class="row"><label>Transportability gap &delta; = &mu;<sub>c</sub> &minus; &mu;<sub>o</sub></label><input type="range" id="dl" min="0" max="2" step="0.05" value="0"><span class="val" id="dlv"></span></div>
-      <div class="row"><label>Effect heterogeneity &tau;&sup2;</label><input type="range" id="t2" min="0" max="1.5" step="0.05" value="0"><span class="val" id="t2v"></span></div>
-      <div class="row"><label>Bias distribution</label>
-        <select id="shape">
-          <option value="gaussian">Gaussian</option>
-          <option value="skewed">skewed (exponential)</option>
-          <option value="heavy">heavy-tailed (t&#8323;)</option>
-          <option value="bimodal">bimodal</option>
-        </select></div>
-      <div class="row"><label>Monte Carlo replicates</label><input type="range" id="R" min="500" max="6000" step="500" value="2000"><span class="val" id="Rv"></span></div>
-      <div class="cards">
-        <div class="card"><div class="k">MSE of &theta;&#770;<sub>CEB</sub></div><div class="v mid" id="mse">.</div></div>
-        <div class="card"><div class="k">relative to experiment</div><div class="v mid" id="re">.</div></div>
-        <div class="card"><div class="k">coverage, plug-in interval</div><div class="v bad" id="cp">.</div></div>
-        <div class="card"><div class="k">coverage, propagated</div><div class="v good" id="cq">.</div></div>
-      </div>
-      <div class="row" style="margin-top:8px"><label>P(&gamma;&#770;&sup2; truncated to 0)</label><span class="val" id="tr" style="color:#333"></span></div>
-    </div>
+<header>
+  <a class="brand" href="https://bohanwu2000.github.io/papers/Wu_et_al_illusion2026.pdf">The Illusion of Learning</a>
+  <nav aria-label="Project"><a href="https://bohanwu2000.github.io/papers/Wu_et_al_illusion2026.pdf">Read the paper</a><a href="https://github.com/bohanwu2000/eb-illusion">GitHub</a></nav>
+</header>
+<main>
+<section class="intro" aria-labelledby="page-title">
+  <p class="eyebrow">An interactive empirical Bayes illustration</p>
+  <h1>How much calibration is enough?</h1>
+  <p>Combine one experiment with biased observational studies. Explore how learning the bias distribution from calibration studies changes estimation error and interval coverage.</p>
+</section>
+<section class="start" aria-label="Getting started">
+  <p><strong>Start with a scenario.</strong> Then adjust the number of observational studies <i>J</i> or calibration studies <i>K</i>. The plots sweep over <i>K</i>, holding your other settings fixed. <a href="#model">See the model and formulas</a>.</p>
+  <div class="presets" role="group" aria-label="Illustrative scenarios">
+    <button type="button" data-preset="shared" aria-pressed="true">Shared bias</button>
+    <button type="button" data-preset="limited" aria-pressed="false">Few calibrators</button>
+    <button type="button" data-preset="shift" aria-pressed="false">Shifted bias</button>
+    <button type="button" data-preset="heavy" aria-pressed="false">Heavy tails</button>
   </div>
-
-  <div class="chartbox"><canvas id="chart"></canvas></div>
-  <div class="note">
-    The <b>plug-in</b> interval is the model-based posterior interval. The <b>propagated</b> interval adds the estimation error in &mu;&#770; and &gamma;&#770;&sup2;.
-    The sweep shows 95% interval coverage against the number of calibration studies K, holding the other settings fixed, with the nominal 0.95 line and a marker at the current K.
-    Raising the transportability gap &delta; biases the estimator and collapses coverage. Raising &tau;&sup2; erodes coverage unless the interval is corrected. The bias shape barely affects results, since only the first two moments enter.
+  <p id="preset-note">Observational and calibration biases share a Gaussian distribution. Compare the two interval constructions as K grows.</p>
+</section>
+<noscript><p>Enable JavaScript to run the simulation. The model and interval formulas are available below.</p></noscript>
+<div class="workspace">
+<aside class="controls" aria-labelledby="controls-title">
+  <h2 id="controls-title">Set the experiment</h2>
+  <p>True target effect θ = 1. Each run draws fresh studies from the model.</p>
+  <div class="study-controls">
+    <div class="control"><div class="control-head"><label for="J">Observational <i>J</i></label><output for="J" id="Jv">50</output></div><input type="range" id="J" min="1" max="100" step="1" value="50" aria-describedby="J-help"><small id="J-help">1–100 observational studies</small></div>
+    <div class="control"><div class="control-head"><label for="K">Calibration <i>K</i></label><output for="K" id="Kv">20</output></div><input type="range" id="K" min="1" max="100" step="1" value="20" aria-describedby="K-help"><small id="K-help">1–100 calibration studies</small></div>
   </div>
+  <details>
+    <summary>Bias distribution</summary>
+    <div class="control"><div class="control-head"><label for="g2">Bias variance γ²</label><output for="g2" id="g2v">1.00</output></div><input type="range" id="g2" min="0" max="4" step="0.05" value="1"></div>
+    <div class="control"><div class="control-head"><label for="mu">Bias mean μ</label><output for="mu" id="muv">0.50</output></div><input type="range" id="mu" min="-2" max="2" step="0.05" value="0.5"></div>
+    <div class="control"><label for="shape">Distribution shape</label><select id="shape"><option value="gaussian">Gaussian</option><option value="skewed">Skewed (centered exponential)</option><option value="heavy">Heavy-tailed (scaled t₃)</option><option value="bimodal">Two-point (μ ± γ)</option></select><small>All shapes have the chosen mean and variance.</small></div>
+  </details>
+  <details>
+    <summary>Sampling noise</summary>
+    <p>Standard deviations of the study estimates.</p>
+    <div class="control"><div class="control-head"><label for="se">Experiment σ<sub>e</sub></label><output for="se" id="sev">1.00</output></div><input type="range" id="se" min="0.2" max="3" step="0.05" value="1"></div>
+    <div class="control"><div class="control-head"><label for="so">Observational σ<sub>o</sub></label><output for="so" id="sov">1.00</output></div><input type="range" id="so" min="0.2" max="3" step="0.05" value="1"></div>
+    <div class="control"><div class="control-head"><label for="sc">Calibration σ<sub>c</sub></label><output for="sc" id="scv">1.00</output></div><input type="range" id="sc" min="0.2" max="3" step="0.05" value="1"></div>
+  </details>
+  <details>
+    <summary>Departures from shared structure</summary>
+    <div class="control"><div class="control-head"><label for="dl">Bias-mean gap δ</label><output for="dl" id="dlv">0.00</output></div><input type="range" id="dl" min="0" max="2" step="0.05" value="0" aria-describedby="dl-help"><small id="dl-help">Calibration bias mean = μ + δ.</small></div>
+    <div class="control"><div class="control-head"><label for="t2">Effect variance τ²</label><output for="t2" id="t2v">0.00</output></div><input type="range" id="t2" min="0" max="1.5" step="0.05" value="0" aria-describedby="t2-help"><small id="t2-help">Observational effects vary around θ = 1.</small></div>
+  </details>
+  <details>
+    <summary>Monte Carlo precision</summary>
+    <div class="control"><div class="control-head"><label for="R">Replicates</label><output for="R" id="Rv">2000</output></div><input type="range" id="R" min="500" max="6000" step="500" value="2000" aria-describedby="R-help"><small id="R-help">Applies to the selected K. Other sweep points use up to 1,200 replicates each.</small></div>
+  </details>
+  <div class="run"><button type="button" class="primary" id="rerun">Run again</button><button type="button" id="reset">Reset</button></div>
+</aside>
+<section class="results" id="results" aria-labelledby="results-title" aria-busy="true" data-pending="true" tabindex="-1">
+  <div class="results-head"><h2 id="results-title">What changes with calibration?</h2><span id="run-status" role="status" aria-live="polite">Preparing simulation…</span></div>
+  <p id="settings-summary">J = 50 · K = 20 · Gaussian bias</p>
+  <div class="metrics result-data" aria-label="Results at the selected number of calibration studies">
+    <dl><dt>Plug-in coverage</dt><dd id="cp">…</dd><small>Nominal coverage 95%</small></dl>
+    <dl><dt>Mean-adjusted coverage</dt><dd id="cq">…</dd><small>Nominal coverage 95%</small></dl>
+    <dl><dt>Calibrated EB MSE</dt><dd id="mse">…</dd><small>Mean squared error for θ</small></dl>
+    <dl><dt>MSE / experiment MSE</dt><dd id="re">…</dd><small>Below 1 means lower MSE</small></dl>
+  </div>
+  <div class="result-data">
+    <figure aria-labelledby="coverage-title">
+      <h3 id="coverage-title">Do 95% intervals cover the true effect?</h3>
+      <p class="figure-intro">Coverage is the fraction of simulated intervals containing θ = 1.</p>
+      <div class="legend" aria-label="Coverage plot legend"><span><i class="key" aria-hidden="true"></i>Plug-in</span><span><i class="key mean" aria-hidden="true"></i>Mean-adjusted</span><span><i class="key target" aria-hidden="true"></i>Nominal 95%</span></div>
+      <svg class="plot" id="chart" role="img" aria-label="Coverage versus number of calibration studies. Numerical values appear in the sweep table below."></svg>
+      <figcaption>The solid curve uses the fitted bias mean and variance as fixed inputs. The dashed purple curve adds estimated bias-mean variance to the interval. The vertical guide marks your selected K.</figcaption>
+    </figure>
+    <figure aria-labelledby="mse-title">
+      <h3 id="mse-title">How accurate is the point estimate?</h3>
+      <div class="legend" aria-label="MSE plot legend"><span><i class="key" aria-hidden="true"></i>Calibrated EB</span><span><i class="key experiment" aria-hidden="true"></i>Experiment alone</span></div>
+      <svg class="plot mse" id="mse-chart" role="img" aria-label="Mean squared error versus number of calibration studies. Numerical values appear in the sweep table below."></svg>
+      <figcaption>Both intervals use the same calibrated EB point estimate. The experimental estimate has theoretical MSE σ<sub>e</sub>², shown in red.</figcaption>
+    </figure>
+    <p class="diagnostics" id="diagnostics">Simulation diagnostics will appear here.</p>
+    <details class="data-details"><summary>View sweep values and Monte Carlo precision</summary><div class="table-scroll"><table><caption id="sweep-caption">Simulation results at each K.</caption><thead><tr><th scope="col">K</th><th scope="col">Plug-in</th><th scope="col">Mean-adjusted</th><th scope="col">MSE</th><th scope="col">Replicates</th></tr></thead><tbody id="sweep-values"></tbody></table></div><p class="diagnostics" id="precision-note"></p></details>
+  </div>
+</section>
 </div>
-
-<script>
+<section class="model" id="model" aria-labelledby="model-title">
+  <h2 id="model-title">Inside the simulation</h2>
+  <p>This playground illustrates finite-sample behavior under a hierarchical model. Each replicate generates one experiment, J observational estimates, and K calibration estimates independently.</p>
+  <div class="model-grid">
+    <div>
+      <h3>Studies and biases</h3>
+      <div class="equation">Y<sub>e</sub> = θ + ε<sub>e</sub><br>Y<sub>oj</sub> = θ<sub>j</sub> + b<sub>j</sub> + ε<sub>oj</sub><br>Y<sub>ck</sub> = b<sub>ck</sub> + ε<sub>ck</sub></div>
+      <p>The target is θ = 1. Observational effects follow θ<sub>j</sub> ∼ N(θ, τ²). Sampling errors are independent centered Gaussians with standard deviations σ<sub>e</sub>, σ<sub>o</sub>, and σ<sub>c</sub>.</p>
+      <p>Observational biases have mean μ and variance γ². Calibration biases have mean μ + δ and the same variance and shape. Gaussian, centered exponential, scaled t₃, and symmetric two-point shapes are available.</p>
+      <p>When δ = 0 and τ² = 0, the two groups share a bias distribution and all studies share the target effect. Increasing δ changes bias transportability. Increasing τ² introduces effect heterogeneity.</p>
+      <h3>Learn the bias distribution</h3>
+      <div class="equation">μ̂ = mean(Y<sub>c</sub>)<br>γ̂² = max{0, K<sup>−1</sup> Σ<sub>k</sub>(Y<sub>ck</sub> − μ̂)² − σ<sub>c</sub>²}</div>
+      <p>Calibration estimates determine the bias mean and variance by moment matching. The variance calculation uses divisor K and truncates negative estimates to zero.</p>
+    </div>
+    <div>
+      <h3>Pool the evidence</h3>
+      <div class="equation">w<sub>e</sub> = 1 / σ<sub>e</sub>²<br>w<sub>o</sub> = 1 / (σ<sub>o</sub>² + γ̂²)<br>D = w<sub>e</sub> + Jw<sub>o</sub><br>θ̂ = {w<sub>e</sub>Y<sub>e</sub> + w<sub>o</sub> Σ<sub>j</sub>(Y<sub>oj</sub> − μ̂)} / D</div>
+      <h3>Compare two interval constructions</h3>
+      <div class="equation">V<sub>plug</sub> = 1 / D<br>V<sub>mean</sub> = V<sub>plug</sub> + (Jw<sub>o</sub> / D)² (γ̂² + σ<sub>c</sub>²) / K<br>Interval: θ̂ ± 1.96 √V</div>
+      <p class="scope"><strong>What “mean-adjusted” includes.</strong> This is the propagated interval in the original playground. Its additional term accounts only for estimation of μ. Uncertainty in γ̂², a bias-mean gap δ, and effect heterogeneity τ² remain outside this variance adjustment.</p>
+      <p>The estimator uses the first two estimated bias moments. The sampling distribution of those estimates, and finite-sample coverage, can still depend on bias shape.</p>
+      <p>All displayed results are fresh Monte Carlo estimates. Increasing the replicate count reduces simulation noise. Run again to see its scale, and use the sweep table for coverage standard errors.</p>
+    </div>
+  </div>
+</section>
+</main>
+<footer><p>Companion to <a href="https://bohanwu2000.github.io/papers/Wu_et_al_illusion2026.pdf">The Illusion of Learning from Observational Data</a><br>Bohan Wu · Sebastian Salazar · Donald P. Green · David M. Blei</p><p><a href="https://github.com/bohanwu2000/eb-illusion">Code and reproducible analyses</a></p></footer>
+</div>
+<script id="simulation-kernel">
 "use strict";
 function randn(){ let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random();
   return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
@@ -118,56 +265,176 @@ function simulate(p){
   }
   return {mse:sse/R, coverPlug:cp/R, coverProp:cq/R, trunc:tr/R};
 }
-const ids=["J","K","g2","mu","se","so","sc","dl","t2","R"];
-function readParams(){
-  const g=id=>parseFloat(document.getElementById(id).value);
-  return {J:g("J")|0,K:g("K")|0,g2:g("g2"),mu:g("mu"),se:g("se"),so:g("so"),sc:g("sc"),
-    dl:g("dl"),t2:g("t2"),shape:document.getElementById("shape").value,R:g("R")|0};
+
+// Yield between batches so controls remain usable and superseded runs can stop.
+// Each batch calls the unchanged simulation kernel and preserves its random draws.
+async function simulateBatched(p, isCurrent) {
+  const totals = {mse: 0, coverPlug: 0, coverProp: 0, trunc: 0}
+  for (let done = 0; done < p.R;) {
+    if (!isCurrent()) return null
+    const count = Math.min(128, p.R - done)
+    const part = simulate({...p, R: count})
+    for (const key of Object.keys(totals)) totals[key] += part[key] * count
+    done += count
+    await new Promise(resolve => setTimeout(resolve, 0))
+  }
+  if (!isCurrent()) return null
+  for (const key of Object.keys(totals)) totals[key] /= p.R
+  return totals
 }
-let chart;
-function fmt(x,n){return x.toFixed(n);}
-function render(){
-  const p=readParams();
-  document.getElementById("Jv").textContent=p.J;
-  document.getElementById("Kv").textContent=p.K;
-  document.getElementById("g2v").textContent=fmt(p.g2,2);
-  document.getElementById("muv").textContent=fmt(p.mu,2);
-  document.getElementById("sev").textContent=fmt(p.se,2);
-  document.getElementById("sov").textContent=fmt(p.so,2);
-  document.getElementById("scv").textContent=fmt(p.sc,2);
-  document.getElementById("dlv").textContent=fmt(p.dl,2);
-  document.getElementById("t2v").textContent=fmt(p.t2,2);
-  document.getElementById("Rv").textContent=p.R;
-  const res=simulate(p);
-  document.getElementById("mse").textContent=fmt(res.mse,3);
-  document.getElementById("re").textContent=fmt(res.mse/(p.se*p.se),2)+"x";
-  const cp=document.getElementById("cp"), cq=document.getElementById("cq");
-  cp.textContent=fmt(res.coverPlug,3); cq.textContent=fmt(res.coverProp,3);
-  cp.className="v "+(res.coverPlug>=0.93?"good":"bad");
-  cq.className="v "+(res.coverProp>=0.93?"good":"bad");
-  document.getElementById("tr").textContent=fmt(res.trunc,3);
-  // sweep over K
-  const Ks=[1,2,3,5,10,20,50,100,150];
-  const plug=[], prop=[]; const Rs=Math.min(p.R,1200);
-  for(const kk of Ks){ const s=simulate(Object.assign({},p,{K:kk,R:Rs})); plug.push(s.coverPlug); prop.push(s.coverProp); }
-  const data={labels:Ks, datasets:[
-    {label:"plug-in", data:plug, borderColor:"#C1121F", backgroundColor:"#C1121F", tension:0.25, pointRadius:3},
-    {label:"propagated", data:prop, borderColor:"#5B2C8D", backgroundColor:"#5B2C8D", tension:0.25, pointRadius:3},
-    {label:"nominal 0.95", data:Ks.map(()=>0.95), borderColor:"#999", borderDash:[6,4], pointRadius:0}
-  ]};
-  if(!chart){
-    chart=new Chart(document.getElementById("chart"),{type:"line",data,
-      options:{responsive:true,maintainAspectRatio:false,
-        scales:{x:{type:"logarithmic",title:{display:true,text:"number of calibration studies K"}},
-                y:{min:0,max:1,title:{display:true,text:"coverage of 95% interval"}}},
-        plugins:{legend:{position:"top"},title:{display:true,text:"Coverage vs K (other settings fixed)"}}}});
-  } else { chart.data=data; chart.update("none"); }
+
+</script>
+<script id="playground-ui">
+"use strict"
+const ids = ["J", "K", "g2", "mu", "se", "so", "sc", "dl", "t2", "R"]
+const $ = id => document.getElementById(id)
+const defaults = {J: 50, K: 20, g2: 1, mu: 0.5, se: 1, so: 1, sc: 1, dl: 0, t2: 0, R: 2000, shape: "gaussian"}
+const presets = {
+  shared: {values: {}, note: "Observational and calibration biases share a Gaussian distribution. Compare the two interval constructions as K grows."},
+  limited: {values: {K: 5}, note: "Five calibration studies estimate a bias distribution used by 50 observational studies. Explore the contribution of bias-mean uncertainty."},
+  shift: {values: {dl: 0.75}, note: "Calibration biases have a mean 0.75 higher than observational biases. Explore how this gap affects estimation and coverage."},
+  heavy: {values: {shape: "heavy"}, note: "Scaled t₃ biases have the same mean and variance as the Gaussian scenario. Explore finite-sample behavior with heavier tails."}
 }
-let timer=null;
-function schedule(){ clearTimeout(timer); timer=setTimeout(render,60); }
-ids.forEach(id=>document.getElementById(id).addEventListener("input",schedule));
-document.getElementById("shape").addEventListener("change",schedule);
-render();
+const shapes = {gaussian: "Gaussian", skewed: "Centered exponential", heavy: "Scaled t₃", bimodal: "Two-point"}
+let revision = 0
+let timer
+let lastResult = null
+
+function readParams() {
+  const p = {shape: $("shape").value}
+  for (const id of ids) p[id] = Number($(id).value)
+  return p
+}
+function updateControls() {
+  const p = readParams()
+  for (const id of ids) $(id + "v").textContent = ["J", "K", "R"].includes(id) ? p[id] : p[id].toFixed(2)
+  let matched = null
+  for (const [key, preset] of Object.entries(presets)) {
+    const values = {...defaults, ...preset.values}
+    const match = Object.keys(values).every(id => p[id] === values[id])
+    document.querySelector(`[data-preset="${key}"]`).setAttribute("aria-pressed", String(match))
+    if (match) matched = key
+  }
+  $("preset-note").textContent = matched ? presets[matched].note : "Custom scenario. The plots hold these settings fixed while varying the number of calibration studies K."
+  return p
+}
+function setPreset(key) {
+  const values = {...defaults, ...presets[key].values}
+  for (const [id, value] of Object.entries(values)) $(id).value = value
+  schedule(0)
+}
+function schedule(delay = 180) {
+  clearTimeout(timer)
+  const ticket = ++revision
+  const p = updateControls()
+  $("results").dataset.pending = "true"
+  $("results").setAttribute("aria-busy", "true")
+  $("run-status").textContent = "Updating to current settings…"
+  timer = setTimeout(() => run(p, ticket), delay)
+}
+async function run(p, ticket) {
+  const isCurrent = () => ticket === revision
+  try {
+    const selected = await simulateBatched(p, isCurrent)
+    if (!selected || !isCurrent()) return
+    const counts = [...new Set([1, 2, 3, 5, 10, 20, 50, 100, p.K])].sort((a, b) => a - b)
+    const sweepR = Math.min(p.R, 1200)
+    const points = []
+    for (const K of counts) {
+      const R = K === p.K ? p.R : sweepR
+      const value = K === p.K ? selected : await simulateBatched({...p, K, R}, isCurrent)
+      if (!value || !isCurrent()) return
+      points.push({K, R, ...value})
+    }
+    lastResult = {p, selected, points}
+    renderResults(lastResult)
+    $("results").dataset.pending = "false"
+    $("results").setAttribute("aria-busy", "false")
+    $("run-status").textContent = "Simulation complete"
+  } catch (error) {
+    if (!isCurrent()) return
+    $("results").setAttribute("aria-busy", "false")
+    $("run-status").textContent = "Simulation interrupted. Select Run again to retry."
+    console.error(error)
+  }
+}
+function percent(value) { return (100 * value).toFixed(1) + "%" }
+function renderResults(result) {
+  const {p, selected, points} = result
+  $("cp").textContent = percent(selected.coverPlug)
+  $("cq").textContent = percent(selected.coverProp)
+  $("mse").textContent = selected.mse.toFixed(3)
+  $("re").textContent = (selected.mse / (p.se * p.se)).toFixed(2) + "×"
+  $("settings-summary").textContent = `Selected: J = ${p.J} · K = ${p.K} · ${shapes[p.shape]} bias · δ = ${p.dl.toFixed(2)} · τ² = ${p.t2.toFixed(2)}`
+  $("diagnostics").textContent = `At K = ${p.K}, the estimated bias variance was at zero in ${percent(selected.trunc)} of replicates.`
+  $("sweep-caption").textContent = `Selected K = ${p.K}: ${p.R.toLocaleString()} replicates. Other points: ${Math.min(p.R, 1200).toLocaleString()} each. Highlighted row matches the summary.`
+  const se = c => (100 * Math.sqrt(c * (1 - c) / p.R)).toFixed(2)
+  $("precision-note").textContent = `Estimated coverage standard errors at K = ${p.K}: plug-in ${se(selected.coverPlug)} percentage points, mean-adjusted ${se(selected.coverProp)} percentage points. At nominal 95% coverage, the reference standard error for other sweep points is ${(100 * Math.sqrt(.95 * .05 / Math.min(p.R, 1200))).toFixed(2)} percentage points.`
+  $("sweep-values").innerHTML = points.map(d => `<tr${d.K === p.K ? ' class="selected"' : ''}><th scope="row">${d.K}${d.K === p.K ? ' (selected)' : ''}</th><td>${percent(d.coverPlug)}</td><td>${percent(d.coverProp)}</td><td>${d.mse.toFixed(3)}</td><td>${d.R.toLocaleString()}</td></tr>`).join("")
+  renderPlots()
+}
+function niceCeiling(value) {
+  const base = 10 ** Math.floor(Math.log10(value))
+  return Math.ceil(value / base * 2) / 2 * base
+}
+function drawPlot(id, result, mse = false) {
+  const svg = $(id)
+  const {points, p} = result
+  const width = Math.max(240, Math.round(svg.getBoundingClientRect().width))
+  const height = Math.round(svg.getBoundingClientRect().height)
+  const pad = {left: 49, right: 15, top: 22, bottom: 49}
+  const w = width - pad.left - pad.right
+  const h = height - pad.top - pad.bottom
+  const ymax = mse ? niceCeiling(Math.max(p.se * p.se, ...points.map(d => d.mse)) * 1.08) : 1
+  const x = K => pad.left + Math.log10(K) / 2 * w
+  const y = value => pad.top + h * (1 - value / ymax)
+  const tickLabel = value => mse ? Number(value.toPrecision(3)).toString() : `${Math.round(value * 100)}%`
+  const line = (x1, y1, x2, y2, attrs = '') => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" ${attrs}/>`
+  let content = `<title>${mse ? 'Mean squared error' : 'Interval coverage'} across calibration sample sizes</title><desc>The vertical guide marks K = ${p.K}. Exact values are in the sweep table below.</desc>`
+  for (let i = 0; i <= 4; i++) {
+    const value = ymax * i / 4
+    content += line(pad.left, y(value), width - pad.right, y(value), 'class="gridline"')
+    content += `<text x="${pad.left - 9}" y="${y(value) + 4}" text-anchor="end">${tickLabel(value)}</text>`
+  }
+  for (const K of (width < 380 ? [1, 5, 20, 100] : [1, 2, 5, 10, 20, 50, 100])) {
+    content += line(x(K), y(0), x(K), y(0) + 5, 'class="axis"')
+    content += `<text x="${x(K)}" y="${y(0) + 21}" text-anchor="middle">${K}</text>`
+  }
+  content += line(pad.left, pad.top, pad.left, y(0), 'class="axis"')
+  content += line(pad.left, y(0), width - pad.right, y(0), 'class="axis"')
+  content += line(x(p.K), pad.top, x(p.K), y(0), 'stroke="#aaa6b1" stroke-dasharray="2 4"')
+  content += `<text x="${Math.max(pad.left + 18, Math.min(width - pad.right - 22, x(p.K)))}" y="12" text-anchor="middle">K = ${p.K}</text>`
+  const target = mse ? p.se * p.se : .95
+  content += line(pad.left, y(target), width - pad.right, y(target), `stroke="${mse ? '#C1121F' : '#777'}" stroke-width="1.5" stroke-dasharray="6 4"`)
+  const series = mse ? [{key: 'mse', color: '#5B2C8D', label: 'Calibrated EB'}] : [
+    {key: 'coverPlug', color: '#5B2C8D', label: 'Plug-in'},
+    {key: 'coverProp', color: '#8D5DAA', label: 'Mean-adjusted', dash: true}
+  ]
+  for (const s of series) {
+    content += `<polyline points="${points.map(d => `${x(d.K)},${y(d[s.key])}`).join(' ')}" fill="none" stroke="${s.color}" stroke-width="2.3" ${s.dash ? 'stroke-dasharray="6 4"' : ''}/>`
+    for (const d of points) {
+      const size = d.K === p.K ? 4.5 : 3
+      const tooltip = `<title>${s.label}, K = ${d.K}: ${mse ? d[s.key].toFixed(3) : percent(d[s.key])}</title>`
+      content += s.dash ? `<rect x="${x(d.K) - size}" y="${y(d[s.key]) - size}" width="${size * 2}" height="${size * 2}" fill="white" stroke="${s.color}" stroke-width="1.8">${tooltip}</rect>` : `<circle cx="${x(d.K)}" cy="${y(d[s.key])}" r="${size}" fill="${s.color}" stroke="white" stroke-width="1">${tooltip}</circle>`
+    }
+  }
+  content += `<text x="${pad.left + w / 2}" y="${height - 5}" text-anchor="middle">Calibration studies K (log scale)</text>`
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`)
+  svg.innerHTML = content
+}
+function renderPlots() {
+  if (!lastResult) return
+  drawPlot("chart", lastResult)
+  drawPlot("mse-chart", lastResult, true)
+}
+for (const id of ids) $(id).addEventListener("input", () => schedule())
+$("shape").addEventListener("change", () => schedule())
+for (const button of document.querySelectorAll("[data-preset]")) button.addEventListener("click", () => setPreset(button.dataset.preset))
+$("rerun").addEventListener("click", () => schedule(0))
+$("reset").addEventListener("click", () => setPreset("shared"))
+let resizeTimer
+window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(renderPlots, 100) })
+schedule(0)
 </script>
 </body>
 </html>

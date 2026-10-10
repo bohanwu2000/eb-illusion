@@ -1,0 +1,48 @@
+{
+  "unit": 89,
+  "districts": "89",
+  "selection": "Smallest calibrated EB absolute benchmark error among retained targets where calibrated EB is closest, its 95% interval contains the benchmark, and observational and illusion intervals exclude it. Selected after inspecting the saved estimates for illustration; the benchmark is noisy.",
+  "posterior_means_pp": {
+    "experimental": -22.576656775469832,
+    "illusion": -22.576656775469832,
+    "calibrated EB": 0.8035519937639093
+  },
+  "posterior_sds_pp": {
+    "experimental": 12.096877441763697,
+    "illusion": 6.486504406216639,
+    "calibrated EB": 6.766484394093261
+  },
+  "posterior_intervals_95_pp": {
+    "experimental": [
+      -46.2861008867217,
+      1.1327873357820373
+    ],
+    "illusion": [
+      -35.28997179721481,
+      -9.863341753724852
+    ],
+    "calibrated EB": [
+      -12.458513720611213,
+      14.065617708139031
+    ]
+  },
+  "held_out_benchmark_pp": 0.34139254440334266,
+  "held_out_benchmark_interval_95_pp": [
+    -11.177849244017033,
+    11.860634332823718
+  ],
+  "observational_estimate_pp": 17.758664305590692,
+  "observational_interval_95_pp": [
+    2.6969694598948557,
+    32.820359151286524
+  ],
+  "held_out_mse_pp2": {
+    "experimental": 268.3837793694239,
+    "observational": 110.95477749278179,
+    "illusion": 268.3837793694239,
+    "calibrated EB": 104.29611265292682
+  },
+  "interpretation": "Points and horizontal 95% intervals. Gaussian posterior intervals condition on fitted prior parameters. The red line marks the held-out experimental benchmark; its normal 95% confidence interval appears in the top row. The gray observational interval is a normal confidence interval for the contacted-minus-uncontacted contrast and includes sampling uncertainty only.",
+  "K": 52,
+  "J": 1
+}

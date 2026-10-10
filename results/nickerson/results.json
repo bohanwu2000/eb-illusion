@@ -1,0 +1,166 @@
+{
+  "seed": 20261002,
+  "counts": {
+    "raw_records": 108734,
+    "raw_variables": 83,
+    "professional_only_or_control": 54717,
+    "also_no_door_assignment": 18204,
+    "missing_age_in_no_door_subset": 24,
+    "also_age_23_to_26": 10018,
+    "missing_required_after_eligibility": 0,
+    "contacted_controls": 2,
+    "assigned_no_calls": 5007,
+    "assigned_professional": 5011,
+    "partition_counts": {
+      "benchmark": 4039,
+      "observational": 3488,
+      "experimental": 2491
+    }
+  },
+  "stratum_weights": {
+    "Alameda": {
+      "Alameda": 1.0
+    },
+    "Boston": {
+      "Boston": 1.0
+    },
+    "Boulder": {
+      "Boulder": 1.0
+    },
+    "Cambridge": {
+      "Cambridge": 1.0
+    },
+    "Denver": {
+      "Denver": 1.0
+    },
+    "Durham": {
+      "Durham, Black": 0.31777777777777777,
+      "Durham, White": 0.6822222222222222
+    },
+    "Hennepin": {
+      "Hennepin": 1.0
+    },
+    "Kansas City": {
+      "Kansas City": 1.0
+    },
+    "Multnomah": {
+      "Multnomah": 1.0
+    },
+    "Pulaski": {
+      "Pulaski": 1.0
+    },
+    "Ramsey": {
+      "Ramsey": 1.0
+    },
+    "Somerville": {
+      "Somerville": 1.0
+    },
+    "St. Louis": {
+      "St. Louis": 1.0
+    },
+    "Wake": {
+      "Wake, Black": 0.17506631299734748,
+      "Wake, White": 0.8249336870026526
+    },
+    "Washtenaw": {
+      "Washtenaw": 1.0
+    }
+  },
+  "units": "Raw estimates in CSV use probability units. Summary metrics use pp or pp^2.",
+  "primary_calibration_year": 2000,
+  "shared_bias_check": {
+    "mean_bias2002_pp": 6.181505666622657,
+    "mean_cal2000_pp": 1.5377658932384999,
+    "mean_gap_pp": 4.643739773384156,
+    "se_gap_pp": 2.4597171905056316,
+    "ci95_gap_pp": [
+      -0.17721733216092828,
+      9.46469687892924
+    ],
+    "normal_p_value": 0.05903720997900749,
+    "interpretation": "Fixed-site mean mismatch, individual stratified influence variance including overlap. Model-conditional normal approximation."
+  },
+  "ranges": {
+    "site_n": [
+      179,
+      1508
+    ],
+    "experimental_n": [
+      44,
+      375
+    ],
+    "benchmark_n": [
+      73,
+      608
+    ],
+    "experimental_contact_rate": [
+      0.2198581560283688,
+      0.625
+    ],
+    "minimum_partition_stratum_contacted": 5,
+    "primary_mu_pp": [
+      0.9137420258246818,
+      2.423830562629416
+    ],
+    "primary_gamma_pp": [
+      0.0,
+      0.0
+    ],
+    "primary_experimental_weight": [
+      0.09951172391857799,
+      0.3460166940044965
+    ]
+  },
+  "methods": [
+    {
+      "calibration_year": 2000,
+      "method": "experimental",
+      "sites": 15,
+      "benchmark_mse_pp2": 451.5398091237429,
+      "mean_signed_gap_pp": -1.104019533789872,
+      "mean_interval_length_pp": 74.86188396589398,
+      "mean_posterior_sd_pp": 19.097770305065552,
+      "mean_benchmark_variance_pp2": 281.8905796705772,
+      "noise_subtracted_mse_pp2": 169.64922945316562
+    },
+    {
+      "calibration_year": 2000,
+      "method": "illusion",
+      "sites": 15,
+      "benchmark_mse_pp2": 451.5398091237429,
+      "mean_signed_gap_pp": -1.104019533789872,
+      "mean_interval_length_pp": 33.9119838181861,
+      "mean_posterior_sd_pp": 8.65117524752483,
+      "mean_benchmark_variance_pp2": 281.8905796705772,
+      "noise_subtracted_mse_pp2": 169.64922945316562
+    },
+    {
+      "calibration_year": 2000,
+      "method": "calibrated EB",
+      "sites": 15,
+      "benchmark_mse_pp2": 118.12170387813227,
+      "mean_signed_gap_pp": 3.389650147635579,
+      "mean_interval_length_pp": 33.9119838181861,
+      "mean_posterior_sd_pp": 8.65117524752483,
+      "mean_benchmark_variance_pp2": 281.8905796705772,
+      "noise_subtracted_mse_pp2": -163.7688757924449
+    }
+  ],
+  "versions": {
+    "python": "3.11.5",
+    "numpy": "1.26.4",
+    "pandas": "3.0.5",
+    "scipy": "1.16.3",
+    "matplotlib": "3.11.1"
+  },
+  "dta_sha256": "b8cba67fffbfdc17de4d6f70e715cc6f9b5823dae7f7d1af1852e8bcf76e067f",
+  "limitations": [
+    "Convenience sites and individual-level independence working assumption.",
+    "Prior zeros do not establish past registration/residence eligibility.",
+    "Benchmark noisy and some site Wald estimates imprecise.",
+    "EB intervals condition on fitted hyperparameters and use estimated sampling variances.",
+    "Leave-one-site-out fits reuse calibration sites across targets.",
+    "J=1 does not test a many-observational-study asymptotic claim.",
+    "Observed shared-bias mismatch limits interpretation of shrinkage gains."
+  ]
+}

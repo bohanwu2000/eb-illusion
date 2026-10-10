@@ -1,69 +1,27 @@
-"""
-Additional simulation studies for the revision of
+"""CVCI comparison and shared-bias sensitivity analyses.
 
-    "The Illusion of Learning from Observational Data:
-     An Empirical Bayes Perspective"
-
-These experiments respond to the referees' requests for
-  (a) finite-sample behaviour at small numbers of calibration studies K,
-      including how often the moment estimator of gamma^2 truncates at zero
-      and how coverage behaves when K is fixed while J grows;
-  (b) misspecification of the Gaussian bias prior (skewed, heavy-tailed,
-      and bimodal bias distributions);
-  (c) violations of the shared-bias ("transportability") assumption, in which
-      the calibration and target bias distributions have different means;
-  (d) effect heterogeneity, theta_j ~ N(theta, tau^2), which the working model
-      ignores, and a simple heterogeneity-corrected variant;
-  (e) a comparison with the no-covariate cross-validated causal inference
-      (CVCI) procedure of Yang et al. (2025), arXiv:2511.00727, Eq. (2),
-      Algorithm 1 and Section 13.1. CVCI uses experimental and observational
-      data; calibrated EB additionally uses the calibration studies.
-
-The calibrated EB estimates use moment matching (eqs. for gamma^2, mu, and the
-posterior mean of theta). Computations are vectorized across replicates. Run:
-
-    python3 referee_simulations.py
-
-To regenerate only the CVCI comparison, preserving all other results:
-
-    python3 referee_simulations.py --experiment cvci --replicates 5000 --bootstrap-replicates 999
-
-To redraw it from saved curves and regenerate the first-replicate forest panel:
-
-    python3 referee_simulations.py --plot-cvci
-
-Figures are written to the repository figures/ directory and a numerical summary to
-referee_sim_summary.json.
+Saved paper results are in results/simulations. Use --plot-only to redraw,
+or --experiment cvci/sensitivity and --output PATH to run new simulations.
+CVCI follows Yang et al. (2025), arXiv:2511.00727, Algorithm 1 and Section 13.1.
 """
 
 import json
 import os
 import argparse
+from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
+from paper_plot_style import (apply_style, finish_figure, PURPLE, GREEN, RED, GRAY,
+                              BLUE, CEB_COLORS, METHOD_LABELS)
 
 # ----------------------------------------------------------------------
 # Plot style: match the existing figures (serif / Times, large labels).
 # ----------------------------------------------------------------------
-plt.rcParams.update({
-    "font.family": ["serif"],
-    "mathtext.fontset": "dejavuserif",
-    "axes.titlesize": 15,
-    "axes.labelsize": 14,
-    "xtick.labelsize": 11,
-    "ytick.labelsize": 11,
-    "legend.fontsize": 11,
-    "figure.facecolor": "white",
-    "axes.facecolor": "white",
-    "savefig.facecolor": "white",
-    "lines.linewidth": 2.0,
-    "lines.markersize": 6,
-})
+apply_style()
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FIGDIR = os.path.abspath(os.environ.get("EB_ILLUSION_FIGDIR",
     os.path.join(HERE, "..", "figures")))
-os.makedirs(FIGDIR, exist_ok=True)
 os.makedirs(FIGDIR, exist_ok=True)
 
 Z = 1.959963985  # 97.5% normal quantile
@@ -114,7 +72,7 @@ def draw_bias(rng, shape, mean, var, dist="gaussian"):
 #   y_o   : (R, J)
 #   y_c   : (R, K)
 # Homoskedastic within-study variances so2, sc2, se2 are scalars.
-# Returns posterior mean, posterior sd, gamma2_hat, mu_hat.
+# Returns posterior mean, plug-in posterior sd, propagated sd, gamma2_hat, mu_hat.
 # ----------------------------------------------------------------------
 def ceb_estimator(y_e, y_o, y_c, se2, so2, sc2):
     R, K = y_c.shape
@@ -145,25 +103,6 @@ def ceb_estimator(y_e, y_o, y_c, se2, so2, sc2):
     return theta_hat, post_sd, post_sd_corr, gam2, mu_hat
 
 
-def direct_correction(y_e, y_o, y_c, se2, so2, sc2):
-    """Direct bias correction (empirical-calibration style): pool the
-    observational studies by inverse variance, subtract the estimated mean
-    bias, and inflate the interval by the estimated bias dispersion. Does NOT
-    use the experimental anchor. Returns point estimate and sd."""
-    R, K = y_c.shape
-    J = y_o.shape[1]
-    if K >= 2:
-        ybar_c = y_c.mean(axis=1, keepdims=True)
-        gam2 = np.maximum(((y_c - ybar_c) ** 2).mean(axis=1) - sc2, 0.0)
-    else:
-        gam2 = np.zeros(R)
-    mu_hat = y_c.mean(axis=1)
-    var_mu = (gam2 + sc2) / K                                  # variance of mu_hat
-    wo = 1.0 / (so2 + gam2)
-    theta_hat = (wo[:, None] * (y_o - mu_hat[:, None])).sum(axis=1) / (J * wo)
-    # variance: pooled observational + propagated calibration-mean uncertainty
-    post_sd = np.sqrt(1.0 / (J * wo) + var_mu)
-    return theta_hat, post_sd, gam2, mu_hat
 
 
 def coverage(theta_hat, post_sd, truth=THETA):
@@ -280,60 +219,6 @@ def cvci_bootstrap_sd(y_o, mean_e_boot, variance_e_boot, n_e, rng,
 #   - coverage as a function of J for several fixed K (shows that K must
 #     grow with J or intervals under-cover).
 # ======================================================================
-def experiment_finite_k(rng, R=20000):
-    Ks = [1, 2, 3, 5, 10, 20, 50, 100]
-    J = 50
-    mse_k, cov_k, covc_k, trunc_k = [], [], [], []
-    for K in Ks:
-        y_e = rng.normal(THETA, SE, size=R)
-        b_o = draw_bias(rng, (R, J), MU, GAM2, "gaussian")
-        y_o = rng.normal(THETA + b_o, SO)
-        b_c = draw_bias(rng, (R, K), MU, GAM2, "gaussian")
-        y_c = rng.normal(b_c, SC)
-        th, sd, sdc, g2, _ = ceb_estimator(y_e, y_o, y_c, SE**2, SO**2, SC**2)
-        mse_k.append(mse(th)); cov_k.append(coverage(th, sd))
-        covc_k.append(coverage(th, sdc)); trunc_k.append(np.mean(g2 <= 1e-12))
-
-    # coverage vs J for a fixed K, plug-in vs propagated-uncertainty interval
-    Js = [5, 10, 20, 50, 100, 200, 500]
-    Kfix = 10
-    cov_plug, cov_corr = [], []
-    for Jv in Js:
-        y_e = rng.normal(THETA, SE, size=R)
-        b_o = draw_bias(rng, (R, Jv), MU, GAM2, "gaussian")
-        y_o = rng.normal(THETA + b_o, SO)
-        b_c = draw_bias(rng, (R, Kfix), MU, GAM2, "gaussian")
-        y_c = rng.normal(b_c, SC)
-        th, sd, sdc, _, _ = ceb_estimator(y_e, y_o, y_c, SE**2, SO**2, SC**2)
-        cov_plug.append(coverage(th, sd)); cov_corr.append(coverage(th, sdc))
-
-    summary["finite_k"] = {
-        "Ks": Ks, "J": 50, "mse": mse_k, "coverage": cov_k,
-        "coverage_corr": covc_k, "p_trunc": trunc_k,
-        "Js": Js, "Kfix": Kfix, "cov_plug_vs_J": cov_plug, "cov_corr_vs_J": cov_corr,
-    }
-
-    fig, ax = plt.subplots(1, 3, figsize=(15, 4.2))
-    ax[0].plot(Ks, mse_k, "o-", color="#5B2C8D")
-    ax[0].axhline(SE**2, ls="--", color="grey", label=r"experiment ($\sigma_e^2$)")
-    ax[0].set_xscale("log"); ax[0].set_xlabel(r"number of calibration studies $K$")
-    ax[0].set_ylabel(r"MSE of $\hat\theta_{\mathrm{CEB}}$"); ax[0].set_title("(a) accuracy ($J=50$)")
-    ax[0].legend(frameon=False)
-    ax[1].plot(Ks, cov_k, "o-", color="#C1121F", label="plug-in interval")
-    ax[1].plot(Ks, covc_k, "s-", color="#5B2C8D", label="propagated uncertainty")
-    ax[1].axhline(0.95, ls="--", color="grey", label="nominal 0.95")
-    ax[1].set_xscale("log"); ax[1].set_xlabel(r"number of calibration studies $K$")
-    ax[1].set_ylabel("coverage of 95% interval"); ax[1].set_ylim(0, 1)
-    ax[1].set_title(r"(b) calibration ($J=50$)"); ax[1].legend(frameon=False)
-    ax[2].plot(Js, cov_plug, "o-", color="#C1121F", label="plug-in interval")
-    ax[2].plot(Js, cov_corr, "s-", color="#5B2C8D", label="propagated uncertainty")
-    ax[2].axhline(0.95, ls="--", color="grey")
-    ax[2].set_xscale("log"); ax[2].set_xlabel(r"number of observational studies $J$")
-    ax[2].set_ylabel("coverage of 95% interval"); ax[2].set_ylim(0, 1)
-    ax[2].set_title(rf"(c) coverage vs $J$ (fixed $K={Kfix}$)"); ax[2].legend(frameon=False)
-    fig.tight_layout()
-    fig.savefig(os.path.join(FIGDIR, "sim_finite_k.pdf"), bbox_inches="tight")
-    plt.close(fig)
 
 
 # ======================================================================
@@ -341,39 +226,6 @@ def experiment_finite_k(rng, R=20000):
 #   MSE and coverage vs J when the true bias prior is skewed/heavy/bimodal
 #   but the method still assumes Gaussian.
 # ======================================================================
-def experiment_misspec(rng, R=20000):
-    Js = [5, 10, 20, 50, 100, 200, 500]
-    dists = ["gaussian", "skewed", "heavy", "bimodal"]
-    labels = {"gaussian": "Gaussian (correct)", "skewed": "skewed (exp.)",
-              "heavy": "heavy-tailed ($t_3$)", "bimodal": "bimodal"}
-    res = {d: {"mse": [], "cov": []} for d in dists}
-    for d in dists:
-        for J in Js:
-            K = J
-            y_e = rng.normal(THETA, SE, size=R)
-            b_o = draw_bias(rng, (R, J), MU, GAM2, d)
-            y_o = rng.normal(THETA + b_o, SO)
-            b_c = draw_bias(rng, (R, K), MU, GAM2, d)
-            y_c = rng.normal(b_c, SC)
-            th, sd, sdc, _, _ = ceb_estimator(y_e, y_o, y_c, SE**2, SO**2, SC**2)
-            res[d]["mse"].append(mse(th)); res[d]["cov"].append(coverage(th, sdc))
-    summary["misspec"] = {"Js": Js, **{d: res[d] for d in dists}}
-
-    fig, ax = plt.subplots(1, 2, figsize=(11, 4.4))
-    for d in dists:
-        ax[0].plot(Js, res[d]["mse"], "o-", label=labels[d])
-    ax[0].set_xscale("log"); ax[0].set_yscale("log")
-    ax[0].set_xlabel(r"number of studies $J=K$"); ax[0].set_ylabel(r"MSE of $\hat\theta_{\mathrm{CEB}}$")
-    ax[0].set_title("(a) accuracy under misspecification"); ax[0].legend(frameon=False)
-    for d in dists:
-        ax[1].plot(Js, res[d]["cov"], "o-", label=labels[d])
-    ax[1].axhline(0.95, ls="--", color="grey")
-    ax[1].set_xscale("log"); ax[1].set_xlabel(r"number of studies $J=K$")
-    ax[1].set_ylabel("coverage of 95% interval"); ax[1].set_ylim(0.7, 1.0)
-    ax[1].set_title("(b) calibration under misspecification"); ax[1].legend(frameon=False)
-    fig.tight_layout()
-    fig.savefig(os.path.join(FIGDIR, "sim_misspec.pdf"), bbox_inches="tight")
-    plt.close(fig)
 
 
 # ======================================================================
@@ -389,7 +241,7 @@ def experiment_sensitivity(rng, R=20000):
     # ---- transportability: shift calibration mean by delta ----
     deltas = np.linspace(0.0, 2.0, 9)
     J = K = 50
-    bias_d, cov_d, bias_dir, cov_dir = [], [], [], []
+    bias_d, cov_d = [], []
     for dlt in deltas:
         y_e = rng.normal(THETA, SE, size=R)
         b_o = draw_bias(rng, (R, J), MU, GAM2, "gaussian")            # target mean MU
@@ -398,41 +250,12 @@ def experiment_sensitivity(rng, R=20000):
         y_c = rng.normal(b_c, SC)
         th, sd, sdc, _, _ = ceb_estimator(y_e, y_o, y_c, SE**2, SO**2, SC**2)
         bias_d.append(np.mean(th) - THETA); cov_d.append(coverage(th, sdc))
-        thd, sdd, _, _ = direct_correction(y_e, y_o, y_c, SE**2, SO**2, SC**2)
-        bias_dir.append(np.mean(thd) - THETA); cov_dir.append(coverage(thd, sdd))
-
-    # ---- effect heterogeneity tau^2 ----
-    taus2 = np.linspace(0.0, 1.0, 6)
-    J = K = 50
-    cov_naive, cov_corr = [], []
-    for t2 in taus2:
-        y_e = rng.normal(THETA, SE, size=R)
-        theta_j = rng.normal(THETA, np.sqrt(t2), size=(R, J))         # study-specific effects
-        b_o = draw_bias(rng, (R, J), MU, GAM2, "gaussian")
-        y_o = rng.normal(theta_j + b_o, SO)
-        b_c = draw_bias(rng, (R, K), MU, GAM2, "gaussian")
-        y_c = rng.normal(b_c, SC)
-        th, sd, sdc, g2, mu_hat = ceb_estimator(y_e, y_o, y_c, SE**2, SO**2, SC**2)
-        cov_naive.append(coverage(th, sdc))
-        # heterogeneity-corrected interval: recover tau^2 from residual dispersion
-        # of the bias-corrected observational estimates minus the calibration gamma^2.
-        resid = y_o - mu_hat[:, None]
-        rbar = resid.mean(axis=1, keepdims=True)
-        tau2_hat = np.maximum(((resid - rbar) ** 2).mean(axis=1) - SO**2 - g2, 0.0)
-        we = 1.0 / SE**2
-        wo = 1.0 / (SO**2 + g2 + tau2_hat)
-        den = we + J * wo
-        num = we * y_e + wo * (y_o - mu_hat[:, None]).sum(axis=1)
-        th_c = num / den
-        var_mu = (g2 + SC**2) / K
-        c = (J * wo) / den
-        sd_c = np.sqrt(1.0 / den + c**2 * var_mu)     # propagate mu-hat + tau^2
-        cov_corr.append(coverage(th_c, sd_c))
 
     summary["sensitivity"] = {
         "deltas": deltas.tolist(), "bias_ceb": bias_d, "cov_ceb": cov_d,
-        "bias_direct": bias_dir, "cov_direct": cov_dir,
-        "taus2": taus2.tolist(), "cov_naive": cov_naive, "cov_corrected": cov_corr,
+        "replicates": R, "J": J, "K": K, "theta": THETA,
+        "bias_mean": MU, "bias_variance": GAM2,
+        "sigma_e": SE, "sigma_o": SO, "sigma_c": SC,
     }
 
     plot_sensitivity(summary["sensitivity"])
@@ -442,18 +265,19 @@ def plot_sensitivity(results):
     """Render bias and coverage separately using the saved simulation results."""
     deltas = np.asarray(results["deltas"])
     fig, ax = plt.subplots(1, 2, figsize=(11, 4.4), sharex=True)
-    ax[0].plot(deltas, np.abs(results["bias_ceb"]), "o-", color="#5B2C8D")
-    ax[0].axhline(0, color="grey", lw=0.8)
+    ax[0].plot(deltas, np.abs(results["bias_ceb"]), "o-", color=PURPLE)
+    ax[0].axhline(0, color=GRAY, lw=0.8)
     ax[0].set_ylabel(r"$|\mathrm{bias}|$ of $\hat\theta$")
     ax[0].set_title("(a) absolute bias")
-    ax[1].plot(deltas, results["cov_ceb"], "s--", color="#C1121F")
-    ax[1].axhline(0.95, ls=":", color="grey", label="nominal coverage (0.95)")
+    ax[1].plot(deltas, results["cov_ceb"], "s--", color=PURPLE)
+    ax[1].axhline(0.95, ls=":", color=GRAY, label="nominal coverage (0.95)")
     ax[1].set_ylabel("coverage of 95% interval")
     ax[1].set_ylim(0, 1)
     ax[1].set_title("(b) coverage")
-    ax[1].legend(frameon=False, loc="upper right")
+    ax[1].legend(frameon=False, loc="upper right", bbox_to_anchor=(1., 1.2))
     for panel in ax:
         panel.set_xlabel(r"mean gap $\delta=\mu_c-\mu_o$")
+    finish_figure(fig)
     fig.tight_layout()
     fig.savefig(os.path.join(FIGDIR, "sim_sensitivity.pdf"), bbox_inches="tight")
     plt.close(fig)
@@ -475,15 +299,58 @@ def draw_cvci_data(rng, R, n_e, max_j, max_k):
     return x_e, y_o, y_c
 
 
+def illusion_estimator(y_e, y_o, se2, so2):
+    """Homoskedastic Gaussian EB with both bias parameters fit by marginal ML.
+
+    This is the paper's eq. (eb_full), integrating out the effect with a flat
+    prior. Profiling the bias mean gives mu_hat = mean(y_o) - y_e and a
+    posterior centered exactly at y_e. For t = so2 + gamma2, the profiled
+    negative twice log likelihood, up to constants, is
+
+        Q/t + (J-1)*log(t) + log(t + J*se2),  Q = sum((y_o-mean(y_o))**2).
+
+    Its nonnegative stationary root solves
+        t**2 + ((J-1)*se2 - Q/J)*t - Q*se2 = 0.
+    Constraining t >= so2 gives the global maximum of the marginal likelihood.
+    Returns posterior mean, plug-in posterior sd, gamma2_hat, mu_hat.
+    """
+    y_e, y_o = np.asarray(y_e, dtype=float), np.asarray(y_o, dtype=float)
+    if (y_e.ndim != 1 or y_o.ndim != 2 or y_e.size == 0
+            or y_o.shape[0] != y_e.size or y_o.shape[1] < 1
+            or not np.isfinite(y_e).all() or not np.isfinite(y_o).all()
+            or not np.isfinite(se2) or not np.isfinite(so2)
+            or se2 <= 0 or so2 <= 0):
+        raise ValueError("Expected finite y_e (R,), y_o (R, J>=1), and positive variances.")
+    J = y_o.shape[1]
+    mean_o = y_o.mean(axis=1)
+    Q = np.sum((y_o - mean_o[:, None])**2, axis=1)
+    b = (J - 1)*se2 - Q/J
+    discriminant = np.sqrt(b**2 + 4*Q*se2)
+    # Rationalize the root for b >= 0 to avoid subtractive cancellation.
+    root = np.zeros_like(Q)
+    positive = Q > 0
+    rational = positive & (b >= 0)
+    root[rational] = 2*Q[rational]*se2 / (b[rational] + discriminant[rational])
+    direct = positive & (b < 0)
+    root[direct] = (discriminant[direct] - b[direct])/2
+    gam2 = np.maximum(root - so2, 0.0)
+    post_sd = np.sqrt(1/(1/se2 + J/(so2 + gam2)))
+    return y_e.copy(), post_sd, gam2, mean_o - y_e
+
+
 def cvci_forest_estimates(x_e, y_o, y_c, Ks, B=999, bootstrap_seed=20260922, J=50):
     """First replicate, fixed before inspecting estimates; no outcome selection.
 
-    Uses the same interval constructions as the coverage panel, with a separate
-    bootstrap seed so this illustration can be regenerated without rerunning
-    the Monte Carlo coverage experiment. The naive interval treats bias as zero.
+    Experimental, illusion, and calibrated EB rows use 95% Gaussian posterior
+    credible intervals. The two EB rows condition on fitted hyperparameters.
+    CVCI uses its independently seeded bootstrap normal interval. The coverage
+    curves in sim_direct retain propagated calibration-mean uncertainty for EB;
+    the corresponding SD and endpoints are also retained here for auditing.
     """
     if J < 1 or J > y_o.shape[1]:
         raise ValueError("Forest-panel J must be available in the simulated data.")
+    if len(Ks) == 0 or any(K < 1 or K > y_c.shape[1] for K in Ks):
+        raise ValueError("Forest calibration counts must be available in the simulated data.")
     x_e, y_o, y_c = x_e[:1], y_o[:1, :J], y_c[:1]
     J, n_e = y_o.shape[1], x_e.shape[1]
     y_e = x_e.mean(axis=1)
@@ -497,16 +364,34 @@ def cvci_forest_estimates(x_e, y_o, y_c, Ks, B=999, bootstrap_seed=20260922, J=5
         return dict(method=method, estimate=estimate, sd=sd,
                     lower=estimate-Z*sd, upper=estimate+Z*sd, **extra)
 
-    rows = [row("experiment", y_e[0], SE),
-            row("naive_observational", y_o.mean(), SO / np.sqrt(J)),
-            row("cvci", theta_cv[0], sd_cv[0], selected_lambda=float(selected[0]))]
+    theta_il, sd_il, gam2_il, mu_il = illusion_estimator(y_e, y_o, SE**2, SO**2)
+    rows = [row("experiment", y_e[0], SE, interval_type="Gaussian posterior credible interval"),
+            row("illusion", theta_il[0], sd_il[0],
+                interval_type="Gaussian plug-in posterior credible interval",
+                gamma2_hat=float(gam2_il[0]), mu_hat=float(mu_il[0])),
+            row("cvci", theta_cv[0], sd_cv[0],
+                interval_type="bootstrap normal confidence interval",
+                selected_lambda=float(selected[0]))]
     for K in Ks:
-        estimate, _, sd, _, _ = ceb_estimator(y_e, y_o, y_c[:, :K], SE**2, SO**2, SC**2)
-        rows.append(row("ceb", estimate[0], sd[0], K=K))
+        estimate, sd, sd_corr, gam2, mu = ceb_estimator(y_e, y_o, y_c[:, :K], SE**2, SO**2, SC**2)
+        rows.append(row("ceb", estimate[0], sd[0], K=int(K),
+                        interval_type="Gaussian plug-in posterior credible interval",
+                        gamma2_hat=float(gam2[0]), mu_hat=float(mu[0]),
+                        propagated_sd=float(sd_corr[0]),
+                        propagated_lower=float(estimate[0] - Z*sd_corr[0]),
+                        propagated_upper=float(estimate[0] + Z*sd_corr[0])))
     return {
-        "J": J, "replicate_index": 0, "selection": "First generated replicate, fixed before inspecting outcomes.",
+        "J": J, "Ks": [int(K) for K in Ks], "replicate_index": 0,
+        "selection": "First generated replicate, fixed before inspecting outcomes.",
+        "coupling": "All rows share the same experimental and observational data; calibrated EB uses nested prefixes of the same calibration sample.",
         "bootstrap_replicates": B, "bootstrap_seed": bootstrap_seed,
-        "naive_interval": "Observational mean +/- 1.959963985 * sigma_o / sqrt(J), ignoring bias and between-study bias dispersion.",
+        "interval_level": 0.95, "normal_quantile": Z,
+        "experimental_interval": "y_e +/- Z*sigma_e: Gaussian posterior credible interval under a flat effect prior, also the known-variance confidence interval.",
+        "illusion_fit": "Global marginal maximum likelihood over bias mean and variance, integrating out theta with a flat prior; homoskedastic profile Q/t + (J-1)*log(t) + log(t + J*sigma_e2), t >= sigma_o2.",
+        "illusion_interval": "y_e +/- Z*sqrt(v), v = (1/sigma_e2 + J/(sigma_o2 + gamma2_hat))^(-1); plug-in posterior credible interval, with mu_hat = mean(y_o) - y_e.",
+        "ceb_interval": "theta_hat +/- Z*sqrt(v), v = (1/sigma_e2 + J/(sigma_o2 + gamma2_hat))^(-1); plug-in posterior credible interval conditional on calibration moment estimates.",
+        "cvci_interval": "Estimate +/- Z times nonparametric bootstrap SD (ddof=1), with within-source resampling and full LOOCV weight reselection; a normal confidence interval.",
+        "coverage_panel_ceb_interval": "The sim_direct coverage curves retain propagated SD sqrt(v + c^2*(gamma2_hat + sigma_c2)/K), c = J*v/(sigma_o2 + gamma2_hat). Forest endpoints use sqrt(v); propagated endpoints are stored separately.",
         "rows": rows,
     }
 
@@ -514,7 +399,7 @@ def cvci_forest_estimates(x_e, y_o, y_c, Ks, B=999, bootstrap_seed=20260922, J=5
 def experiment_cvci(rng, R=5000, n_e=100, B=999, bootstrap_seed=20260921):
     if R < 2 or n_e < 2 or B < 2:
         raise ValueError("At least two simulation and bootstrap replicates and experimental measurements are required.")
-    Js = [2, 5, 10, 20, 50, 100, 200, 500]
+    Js = [2, 5, 10, 20, 50, 100]
     Ks = [5, 10, 25, 50]
 
     def evaluate(theta_hat, sd):
@@ -576,70 +461,96 @@ def experiment_cvci(rng, R=5000, n_e=100, B=999, bootstrap_seed=20260921):
         "cvci": cvci_rows, "ceb": ceb_rows,
         "forest": cvci_forest_estimates(x_e, y_o, y_c, Ks, B, bootstrap_seed+1),
     }
-    summary.pop("direct", None)
     summary["cvci"] = results
     plot_cvci(results)
+    plot_cvci_forest(results)
     return results
 
 
 def plot_cvci(results):
-    """Shared-bias MSE, 95% interval coverage, and one-replicate forest plot.
+    """Shared-bias MSE and 95% interval coverage in sim_direct.
 
     Error bars describe Monte Carlo uncertainty in the plotted performance
-    estimates, distinct from the causal intervals whose coverage is measured.
+    estimates. Calibrated EB coverage uses propagated calibration uncertainty;
+    its plug-in posterior intervals are displayed separately by plot_cvci_forest.
     """
-    fig, ax = plt.subplots(1, 3, figsize=(14.2, 5.2), layout="constrained",
-                           gridspec_kw={"width_ratios": [1, 1, 1.05]})
-    styles = [("CVCI", "#0A6E31", "s", results["cvci"])]
+    fig, ax = plt.subplots(1, 2, figsize=(10.4, 4.2), layout="constrained")
+    styles = [(METHOD_LABELS["cvci"] + " (Yang et al., 2025)", BLUE, "s", results["cvci"])]
     for K, color, marker in zip(results["Ks"],
-                                ("#5B2C8D", "#0072B2", "#D55E00", "#CC79A7"),
+                                CEB_COLORS,
                                 ("o", "^", "D", "v")):
-        styles.append((rf"calibrated EB ($K={K}$)", color, marker, results["ceb"][str(K)]))
+        styles.append((METHOD_LABELS["ceb"] + rf" ($K={K}$)", color, marker, results["ceb"][str(K)]))
     for panel, metric in zip(ax, ("mse", "coverage")):
         for label, color, marker, rows in styles:
-            panel.errorbar(results["Js"], [row[metric] for row in rows],
+            rows = [row for row in rows if row["J"] <= 100]
+            panel.errorbar([row["J"] for row in rows], [row[metric] for row in rows],
                            yerr=[Z * row[metric + "_mcse"] for row in rows],
                            fmt=marker + "-", color=color, label=label,
-                           capsize=2.5, elinewidth=1.0)
+                           capsize=3, elinewidth=2.0)
         panel.set_xscale("log")
-        panel.set_xlabel(r"observational studies $J$", fontsize=17)
+        panel.set_xlabel(r"observational studies $J$")
         if metric == "coverage":
             # One shared method legend keeps the MSE curves unobscured.
-            panel.legend(frameon=False, fontsize=12)
+            panel.legend(frameon=False, loc="lower left")
     ax[0].set_yscale("log")
-    ax[0].set_ylabel(r"MSE of $\hat\theta$", fontsize=17)
-    ax[0].set_title("(a) estimation accuracy", fontsize=17)
-    ax[0].axhline(results["sigma_e2"], ls="--", color="grey", linewidth=1.3)
-    ax[1].set_ylabel("coverage of 95% interval", fontsize=17)
+    ax[0].set_ylabel("MSE")
+    ax[0].set_title("(a) estimation accuracy")
+    experimental_line = ax[0].axhline(results["sigma_e2"], ls="--", color=RED,
+                                      linewidth=1.6, label=METHOD_LABELS["experiment"])
+    ax[0].legend(handles=[experimental_line], loc="lower left", frameon=False)
+    ax[1].set_ylabel("coverage of 95% interval")
     ax[1].set_ylim(0.7, 1.0)
-    ax[1].set_title("(b) interval coverage", fontsize=17)
-    ax[1].axhline(0.95, ls="--", color="grey", linewidth=1.3)
+    ax[1].set_title("(b) interval coverage")
+    ax[1].axhline(0.95, ls=":", color=GRAY, linewidth=1.6)
+    # Explicitly distinguish these causal intervals from the forest's posterior
+    # intervals. Place the note above the legend, clear of the coverage curves.
+    ax[1].text(.04, .53, "calibrated EB: propagated uncertainty",
+               transform=ax[1].transAxes, ha="left", va="bottom",
+               fontsize=9 * fig.get_figwidth()/10.25)
+    finish_figure(fig, width_fraction=1.)
+    fig.savefig(os.path.join(FIGDIR, "sim_direct.pdf"))
+    fig.savefig(os.path.join(FIGDIR, "sim_direct.png"), dpi=180)
+    plt.close(fig)
+
+
+def plot_cvci_forest(results):
+    """Draw sim_finite_k_methods from the saved cvci first-replicate summary.
+
+    This is the shared entry point for simulation_restructure.plot_comparison.
+    It renders saved endpoints without rerunning simulations or writing JSON.
+    """
     forest = results["forest"]
     rows = forest["rows"]
-    experiment = rows[0]
-    ax[2].axvspan(experiment["lower"], experiment["upper"], color="#C1121F",
-                  alpha=0.08, label="experimental 95% interval")
-    ax[2].axvline(results["theta"], ls=":", color="0.25", linewidth=1.5,
-                  label=rf"true effect $\theta^\star={results['theta']:g}$")
-    colors = ["#C1121F", "#555555"] + [style[1] for style in styles]
-    markers = ["o", "X"] + [style[2] for style in styles]
-    labels = ["Experimental", "Naive observational\n(illusion)"] + [style[0] for style in styles]
+    if ([row["method"] for row in rows[:3]] != ["experiment", "illusion", "cvci"]
+            or any(row["method"] != "ceb" for row in rows[3:])
+            or any(row.get("interval_type") != "Gaussian plug-in posterior credible interval"
+                   for row in [rows[1], *rows[3:]])):
+        raise ValueError("Regenerate the posterior forest with referee_simulations.py --plot-cvci.")
+    if len(rows) - 3 > len(CEB_COLORS):
+        raise ValueError("Forest calibration counts exceed the shared calibrated EB palette.")
+    fig, ax = plt.subplots(figsize=(6., 4.2), layout="constrained")
+    ax.axvline(results["theta"], ls=":", color="0.25", linewidth=1.5,
+               label=rf"true effect $\theta^\star={results['theta']:g}$")
+    colors = [RED, GREEN, BLUE, *CEB_COLORS]
+    markers = ["o", "X", "s", "o", "^", "D", "v"]
+    # Section numbers are checked against the current main.aux. The staged
+    # caption also uses symbolic LaTeX labels for the eventual manuscript edit.
+    labels = ["experimental (§3.1)", "illusion (§3.4)",
+              "CVCI (Yang et al., 2025)"] + [
+        METHOD_LABELS["ceb"] + rf" ($K={row['K']}$, §3.5)" for row in rows[3:]]
     ys = np.arange(len(rows))[::-1]
     for row, y, color, marker in zip(rows, ys, colors, markers):
-        ax[2].errorbar(row["estimate"], y,
-                       xerr=[[row["estimate"]-row["lower"]], [row["upper"]-row["estimate"]]],
-                       fmt=marker, color=color, capsize=3, linewidth=2, zorder=3)
-    ax[2].set_yticks(ys, labels=labels, fontsize=12)
-    ax[2].set_ylim(-0.6, len(rows)-0.3)
-    ax[2].set_xlabel(r"effect estimate $\hat\theta$", fontsize=17)
-    ax[2].set_title(rf"(c) results ($J={forest['J']}$)", fontsize=17)
-    for panel in ax:
-        panel.tick_params(axis="x", labelsize=13)
-    for panel in ax[:2]:
-        panel.tick_params(axis="y", labelsize=13)
-    # The caption defines the experimental band and true-effect reference line.
-    # Reuse the existing comparison artifact rather than add a project file.
-    fig.savefig(os.path.join(FIGDIR, "sim_direct.pdf"), bbox_inches="tight")
+        ax.errorbar(row["estimate"], y,
+                    xerr=[[row["estimate"]-row["lower"]], [row["upper"]-row["estimate"]]],
+                    fmt=marker, color=color, capsize=3, linewidth=2, zorder=3)
+    ax.set_yticks(ys, labels=labels)
+    ax.set_ylim(-0.6, len(rows)-0.3)
+    ax.set_xlabel(r"effect $\theta$")
+    ax.set_title(rf"results ($J={forest['J']}$)")
+    # Method names and distinct markers supplement the shared color mapping.
+    finish_figure(fig, width_fraction=.72)
+    fig.savefig(os.path.join(FIGDIR, "sim_finite_k_methods.pdf"))
+    fig.savefig(os.path.join(FIGDIR, "sim_finite_k_methods.png"), dpi=180)
     plt.close(fig)
 
 
@@ -673,98 +584,66 @@ def check_cvci():
     print("CVCI check passed: literal leave-one-out losses, grid selection, full-data refit, endpoints and ties.")
 
 
+
+
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--experiment", choices=("all", "cvci"), default="all")
-    parser.add_argument("--replicates", type=int, default=None,
-                        help="Monte Carlo replicates (default: 5000 for CVCI, 20000 for other experiments)")
-    parser.add_argument("--seed", type=int, default=20260920, help="CVCI comparison seed")
-    parser.add_argument("--bootstrap-replicates", type=int, default=999)
-    parser.add_argument("--bootstrap-seed", type=int, default=20260921)
-    parser.add_argument("--check-cvci", action="store_true")
-    parser.add_argument("--plot-cvci", action="store_true",
-                        help="Reuse saved performance curves and regenerate the first-replicate forest plot")
+    parser.add_argument('--experiment', choices=('cvci', 'sensitivity'), default='cvci')
+    parser.add_argument('--plot-only', action='store_true')
+    parser.add_argument('--plot-cvci', action='store_true', help='Alias for --experiment cvci --plot-only')
+    parser.add_argument('--from-results', type=Path)
+    parser.add_argument('--output', type=Path)
+    parser.add_argument('--replicates', type=int)
+    parser.add_argument('--seed', type=int, default=20260920)
+    parser.add_argument('--bootstrap-replicates', type=int, default=999)
+    parser.add_argument('--bootstrap-seed', type=int, default=20260921)
+    parser.add_argument('--check-cvci', action='store_true')
     args = parser.parse_args()
     if args.check_cvci:
         check_cvci()
         return
-    if args.replicates is not None and args.replicates < 2:
-        parser.error("--replicates must be at least 2")
-    if args.bootstrap_replicates < 2:
-        parser.error("--bootstrap-replicates must be at least 2")
-    R = args.replicates if args.replicates is not None else 20000
-    R_cvci = args.replicates if args.replicates is not None else 5000
-    output = os.path.join(HERE, "referee_sim_summary.json")
-    if args.plot_cvci:
-        with open(output) as f:
-            summary.update(json.load(f))
-        results = summary["cvci"]
-        expected = {"theta": THETA, "mu_o": MU, "mu_c": MU, "gamma2": GAM2,
-                    "sigma_e2": SE**2, "sigma_o2": SO**2, "sigma_c2": SC**2}
-        if any(results.get(key) != value for key, value in expected.items()):
-            parser.error("Saved parameters differ from the current model; regenerate the CVCI experiment.")
-        x_e, y_o, y_c = draw_cvci_data(np.random.default_rng(results["seed"]),
-                                      results["replicates"], results["n_exp"],
-                                      max(results["Js"]), max(results["Ks"]))
-        results["forest"] = cvci_forest_estimates(
-            x_e, y_o, y_c, results["Ks"], results["bootstrap_replicates"],
-            results["bootstrap_seed"]+1)
-        plot_cvci(results)
-        with open(output, "w") as f:
-            json.dump(summary, f, indent=2)
-        print(json.dumps(results["forest"], indent=2))
+    kind = 'cvci' if args.plot_cvci else args.experiment
+    saved = Path(HERE).parent / 'results/simulations' / (kind + '.json')
+    if args.plot_only or args.plot_cvci or args.from_results:
+        result = json.loads((args.from_results or saved).read_text())
+        if kind == 'cvci':
+            plot_cvci(result)
+            plot_cvci_forest(result)
+        else:
+            plot_sensitivity(result)
         return
-    if args.experiment == "cvci":
-        if os.path.exists(output):
-            with open(output) as f:
-                summary.update(json.load(f))
-        results = experiment_cvci(np.random.default_rng(args.seed), R=R_cvci,
-                                  B=args.bootstrap_replicates,
-                                  bootstrap_seed=args.bootstrap_seed)
-        results["seed"] = args.seed
-        with open(output, "w") as f:
-            json.dump(summary, f, indent=2)
-        print(json.dumps(results, indent=2))
-        return
-    rng = np.random.default_rng(20260714)
-    experiment_finite_k(rng, R=R)
-    experiment_misspec(rng, R=R)
-    experiment_sensitivity(rng, R=R)
-    experiment_cvci(np.random.default_rng(args.seed), R=R_cvci,
-                    B=args.bootstrap_replicates, bootstrap_seed=args.bootstrap_seed)
-    summary["cvci"]["seed"] = args.seed
-    with open(os.path.join(HERE, "referee_sim_summary.json"), "w") as f:
-        json.dump(summary, f, indent=2)
-    # concise console report
-    def r(x, n=4):
-        return [round(float(v), n) for v in x]
-    print("=== FINITE K (J=50) ===")
-    print("K:", summary["finite_k"]["Ks"])
-    print("MSE:", r(summary["finite_k"]["mse"]))
-    print("cov plug-in :", r(summary["finite_k"]["coverage"]))
-    print("cov corrected:", r(summary["finite_k"]["coverage_corr"]))
-    print("P(gamma2_hat=0):", r(summary["finite_k"]["p_trunc"]))
-    print(f"cov vs J at fixed K={summary['finite_k']['Kfix']} for J={summary['finite_k']['Js']}:")
-    print("  plug-in :", r(summary["finite_k"]["cov_plug_vs_J"]))
-    print("  corrected:", r(summary["finite_k"]["cov_corr_vs_J"]))
-    print("=== MISSPEC (coverage vs J) ===")
-    for d in ["gaussian", "skewed", "heavy", "bimodal"]:
-        print(f"{d:9s} cov:", r(summary["misspec"][d]["cov"]))
-    print("=== SENSITIVITY: transportability (delta) ===")
-    print("delta:", r(summary["sensitivity"]["deltas"], 3))
-    print("bias CEB:", r(summary["sensitivity"]["bias_ceb"]))
-    print("cov  CEB:", r(summary["sensitivity"]["cov_ceb"]))
-    print("=== SENSITIVITY: heterogeneity (tau^2) ===")
-    print("tau^2:", r(summary["sensitivity"]["taus2"], 3))
-    print("cov plug-in:", r(summary["sensitivity"]["cov_naive"]))
-    print("cov corrected:", r(summary["sensitivity"]["cov_corrected"]))
-    print("=== CVCI vs EB (shared bias, MSE and coverage vs J) ===")
-    print("J:", summary["cvci"]["Js"])
-    for metric in ("mse", "coverage"):
-        print(metric, "CVCI:", r([v[metric] for v in summary["cvci"]["cvci"]]))
-        for K in summary["cvci"]["Ks"]:
-            print(metric, f"EB K={K}:", r([v[metric] for v in summary["cvci"]["ceb"][str(K)]]))
+    output = args.output or Path(HERE).parent / 'results' / (kind + '_rerun.json')
+    if output.exists():
+        parser.error('Choose a new --output path to preserve existing results.')
+    count = args.replicates or (5000 if kind == 'cvci' else 20000)
+    if count < 2 or args.bootstrap_replicates < 2:
+        parser.error('At least two simulation and bootstrap replicates are required.')
+    rng = np.random.default_rng(args.seed)
+    if kind == 'cvci':
+        result = experiment_cvci(rng, R=count, B=args.bootstrap_replicates,
+                                 bootstrap_seed=args.bootstrap_seed)
+        result['seed'] = args.seed
+        # Match the paper's deliberately noisy experimental illustration.
+        x, o, c = draw_cvci_data(np.random.default_rng(args.seed), count, result['n_exp'],
+                                 max(result['Js']), max(result['Ks']))
+        x = x[:1].copy()
+        original_mean = float(x.mean())
+        x += THETA + 2*SE - original_mean
+        result['forest'] = cvci_forest_estimates(x, o[:1], c[:1], [10],
+            args.bootstrap_replicates, args.bootstrap_seed + 1, J=50)
+        result['forest'].update(selection='Deliberate illustration: experimental mean theta + 2 sigma_e.',
+            original_experimental_mean=original_mean, imposed_experimental_mean=THETA+2*SE,
+            experimental_standardized_error=2.)
+        plot_cvci_forest(result)
+    else:
+        experiment_sensitivity(rng, R=count)
+        result = dict(summary['sensitivity'], seed=args.seed)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(result, indent=2) + '\n')
+    print('Saved', output)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

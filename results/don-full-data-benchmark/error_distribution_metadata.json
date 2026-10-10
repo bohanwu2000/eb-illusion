@@ -1,0 +1,51 @@
+{
+  "baseline_districts": 53,
+  "comparison_districts": null,
+  "posterior_panel": {
+    "district": 89,
+    "J": 1,
+    "K": 52,
+    "selection": "Explicit district identifier; retained from the previous illustration.",
+    "means_pp": {
+      "full RCT benchmark": -0.65836298932384,
+      "experimental": -22.576656775469832,
+      "observational": 17.758664305590692,
+      "illusion": -22.576656775469832,
+      "calibrated EB": 0.8035519937639001
+    },
+    "intervals_95_pp": {
+      "full RCT benchmark": [
+        -9.621578520941409,
+        8.30485254229373
+      ],
+      "experimental": [
+        -46.28610088672167,
+        1.1327873357820089
+      ],
+      "observational": [
+        2.6969694598949037,
+        32.82035915128648
+      ],
+      "illusion": [
+        -35.28997179721468,
+        -9.863341753724983
+      ],
+      "calibrated EB": [
+        -12.458513720611219,
+        14.065617708139019
+      ]
+    },
+    "interpretation": "The benchmark and observational rows show normal 95% confidence intervals. The experimental row also agrees with its flat-prior Gaussian credible interval. Illusion and calibrated EB show 95% posterior credible intervals conditional on fitted parameters. The red line marks the experimental benchmark."
+  },
+  "benchmark": "full",
+  "median_benchmark_sd_pp": {
+    "top half": 4.73893162910489
+  },
+  "median_held_out_benchmark_sd_pp": {
+    "top half": 7.04473989354135
+  },
+  "common_target_calibrated_eb_mse_pp2": null,
+  "definition": "Squared difference from each district's full Wald estimate, in squared percentage points. Boxes show the interquartile range and median; whiskers extend to observations within 1.5 IQR. Outlier markers are hidden. Every district enters the MSE, quantiles, and exported error table.",
+  "design": "All fitted estimates use the original household splits within each district. Each target uses full-sample calibration estimates from the other districts in its retained cohort. Benchmark sampling uncertainty contributes to the squared errors.",
+  "evaluation": "The full-data benchmark uses all eligible GOTV and control observations in the target district, including the experimental and observational subsets. All fitted method estimates and sample splits are unchanged. Shared data induce covariance between each estimate and the benchmark, which affects squared errors differently across methods. This comparison measures agreement with the full-data experimental estimate; it is not independent held-out evaluation or risk against a known causal effect. Benchmark and standard-error columns in evaluation_benchmarks.csv are in probability units. Error summaries are in squared percentage points."
+}

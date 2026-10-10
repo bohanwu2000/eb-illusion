@@ -1,0 +1,195 @@
+{
+  "seed": 20260926,
+  "split_fractions": [
+    0.1,
+    0.45,
+    0.45
+  ],
+  "J": 1,
+  "K": 52,
+  "analysis_units": 53,
+  "grouping": "districts",
+  "mse_against_benchmark_pp2": {
+    "experimental": 268.3837793694239,
+    "illusion": 268.3837793694239,
+    "calibrated EB": 104.29611265292682
+  },
+  "naive_observational_benchmark_mse_pp2": 110.95477749278179,
+  "median_small_rct_households": 655.0,
+  "median_experimental_weight": 0.25433843343673274,
+  "method_definitions": {
+    "experimental": "Wald estimate from the 10% experimental household split.",
+    "illusion": "Same-target Gaussian EB with J=1: mu_hat=obs-small_rct, gamma2_hat=0; mean=small_rct, variance=(1/ve+1/var_obs)^-1.",
+    "calibrated EB": "Small RCT combined with the bias-corrected observational estimate; bias parameters learned from the other 52 districts.",
+    "naive observational": "Raw contacted-minus-uncontacted contrast in the observational split, retained as a separate diagnostic."
+  },
+  "boxplot_definition": "53 individual squared benchmark discrepancies per method in pp^2; their arithmetic mean is the reported MSE.",
+  "interpretation": "One fixed household split; MSE measures agreement with noisy held-out Wald benchmarks rather than risk against known causal effects. 53 fixed districts. Gaussian working-model intervals condition on fitted hyperparameters. Disjoint household samples do not imply exact finite-population independence or coverage.",
+  "benchmark_standard_error_pp": {
+    "count": 53.0,
+    "mean": 6.964411656300253,
+    "std": 1.3211639636841732,
+    "min": 4.0474320676741815,
+    "25%": 6.123134972639633,
+    "50%": 7.04473989354135,
+    "75%": 7.910735435993553,
+    "max": 9.809261138266463
+  },
+  "contact_counts": {
+    "experimental_contacted_voters": {
+      "count": 53.0,
+      "mean": 17.49056603773585,
+      "std": 4.80633652871768,
+      "min": 9.0,
+      "25%": 14.0,
+      "50%": 17.0,
+      "75%": 22.0,
+      "max": 29.0
+    },
+    "experimental_contacted_households": {
+      "count": 53.0,
+      "mean": 10.962264150943396,
+      "std": 2.90200371196645,
+      "min": 5.0,
+      "25%": 9.0,
+      "50%": 10.0,
+      "75%": 13.0,
+      "max": 18.0
+    },
+    "observational_contacted_voters": {
+      "count": 53.0,
+      "mean": 75.15094339622641,
+      "std": 13.256923048289632,
+      "min": 53.0,
+      "25%": 65.0,
+      "50%": 74.0,
+      "75%": 85.0,
+      "max": 106.0
+    },
+    "observational_contacted_households": {
+      "count": 53.0,
+      "mean": 47.698113207547166,
+      "std": 8.146695662519058,
+      "min": 35.0,
+      "25%": 42.0,
+      "50%": 46.0,
+      "75%": 53.0,
+      "max": 67.0
+    },
+    "benchmark_contacted_voters": {
+      "count": 53.0,
+      "mean": 78.43396226415095,
+      "std": 14.4108792156405,
+      "min": 53.0,
+      "25%": 67.0,
+      "50%": 79.0,
+      "75%": 90.0,
+      "max": 113.0
+    },
+    "benchmark_contacted_households": {
+      "count": 53.0,
+      "mean": 49.509433962264154,
+      "std": 8.454909000805467,
+      "min": 34.0,
+      "25%": 43.0,
+      "50%": 49.0,
+      "75%": 56.0,
+      "max": 68.0
+    },
+    "full_contacted_voters": {
+      "count": 53.0,
+      "mean": 171.0754716981132,
+      "std": 28.970043583915977,
+      "min": 135.0,
+      "25%": 146.0,
+      "50%": 166.0,
+      "75%": 194.0,
+      "max": 246.0
+    }
+  },
+  "design": {
+    "source": "Data supplied by Donald P. Green",
+    "source_url": "https://drive.google.com/file/d/1ie-qqv9TmPCw-kD_oLGh4QWh6DmOUU3x/view",
+    "source_filename": "etov_august_2008_no PII.dta",
+    "sha256": "b33ae21914a5277d0779fb31e57a47d9f019ad7ecfcadbd913d417caa835b5ec",
+    "cleaning": {
+      "raw_n": 903999,
+      "excluded_households": 11,
+      "excluded_people": 22
+    },
+    "analysis_people": 546039,
+    "arm_counts": {
+      "0": 531035,
+      "1": 15004
+    },
+    "grouping": "individual districts",
+    "selection": {
+      "rule": "Rank full-sample GOTV contacted-voter counts and include all ties at the cutoff. Selection uses no turnout outcomes, treatment-effect estimates, or benchmark errors.",
+      "requested_district_count": 52,
+      "retained_district_count": 53,
+      "minimum_contacted_voters": 135,
+      "retained_districts": [
+        13,
+        19,
+        20,
+        21,
+        23,
+        27,
+        32,
+        33,
+        38,
+        39,
+        40,
+        43,
+        45,
+        47,
+        51,
+        56,
+        57,
+        61,
+        63,
+        66,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        77,
+        79,
+        80,
+        82,
+        84,
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91,
+        93,
+        94,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109
+      ]
+    },
+    "target": "Complier average effect of GOTV contact on August 2008 primary turnout within each target.",
+    "calibration": "Observational minus full-sample Wald contrasts in the other 52 retained individual districts. Household-clustered variances account for covariance and the estimated contact rate.",
+    "evaluation": "One fixed household split within district and assignment arm: 10% experimental, 45% observational, and 45% held-out experimental benchmark. Selection is held fixed.",
+    "experimental_zero_gotv_turnout_districts": [
+      66,
+      94
+    ]
+  }
+}
