@@ -370,7 +370,7 @@ def main():
     else:
         if args.data is None:
             parser.error('supply --data /path/to/pro_v_vol_2002.dta or use --from-results. '
-                         'See data/nickerson/README.md for the official download.')
+                         'See data/nickerson/source_manifest.json for the official download URL and checksums.')
         if not args.data.is_file():
             parser.error(f'data file does not exist: {args.data}')
         summary = analyze(args.data, args.output, args.figure_dir)
